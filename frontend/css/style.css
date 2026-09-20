@@ -841,6 +841,14 @@ footer.site-footer .social-links svg {
   flex-shrink: 0;
 }
 
+.np-volume input[type="range"] {
+  /* Range inputs render at a browser-default width (~129px in Chromium)
+     that doesn't actually shrink to fit a flex item's declared width,
+     which was pushing the whole bar past the viewport edge. */
+  width: 90px;
+  min-width: 0;
+}
+
 input[type="range"] {
   accent-color: var(--accent);
 }
