@@ -34,24 +34,23 @@ guestbook).
 - [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 - Python 3.12+ (for the Lambda code and the admin script)
 
-Neither the AWS CLI nor SAM CLI were found on this machine — install both
-before deploying.
-
 ## Deploy the backend
+
+`FrontendBucketName` and `CorsAllowOrigin` both have defaults set directly in
+`template.yaml`, so no `--parameter-overrides` are needed for a normal
+deploy:
 
 ```bash
 cd backend
 sam build
-sam deploy --guided
+sam deploy --stack-name aniketsurve-website --region us-east-1 --capabilities CAPABILITY_IAM --resolve-s3
 ```
 
-`sam deploy --guided` will ask for:
-- **Stack name** — e.g. `aniketsurve-website`
-- **FrontendBucketName** — a globally unique S3 bucket name, e.g. `aniketsurve-website-frontend`
-- **CorsAllowOrigin** — leave as `*` for the first deploy
-
-It saves your answers to `backend/samconfig.toml`, so future deploys are just
-`sam build && sam deploy`.
+To change the bucket name or lock down CORS, edit the `Default:` values for
+`FrontendBucketName` / `CorsAllowOrigin` in `template.yaml` directly, then
+redeploy. Note that changing `FrontendBucketName` replaces the S3 bucket —
+empty the old one first (`aws s3 rm s3://<old-bucket> --recursive`) so
+CloudFormation can delete it during the update.
 
 After it finishes, note the outputs (also available anytime via
 `sam list stack-outputs --stack-name <your-stack-name>`):
@@ -70,9 +69,9 @@ aws s3 sync frontend s3://<FrontendBucketNameOutput> --delete
 
 Visit the `WebsiteURL` output to see the site live.
 
-Once you know the site's URL, redeploy the backend with
-`sam deploy --parameter-overrides CorsAllowOrigin=<your WebsiteURL>` to lock
-the API down to your own frontend instead of `*`.
+Once you know the site's URL, set `CorsAllowOrigin`'s `Default:` in
+`template.yaml` to that URL and redeploy to lock the API down to your own
+frontend instead of `*`.
 
 > The S3 website endpoint is HTTP-only. For HTTPS and a custom domain, put
 > CloudFront + an ACM certificate (+ Route 53, if you buy a domain) in front
