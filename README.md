@@ -21,6 +21,7 @@ frontend/
   apps/                   landing page for small client-side apps (add more here)
 scripts/
   add_post.py             admin CLI to write a blog post directly into DynamoDB
+  add_song.py             admin CLI to upload a song to S3 and update songs/manifest.json
 ```
 
 There is intentionally **no public "create post" endpoint** — posts are added
@@ -93,6 +94,30 @@ Each app is just a folder under `frontend/apps/` with its own `index.html`
 `frontend/apps/index.html`. Keep them client-side only unless one specifically
 needs persistence — then it can call the same API Gateway + add a new
 Lambda/table pair in `template.yaml`.
+
+## Music player
+
+`frontend/apps/music/` is an S3-only app — no Lambda or DynamoDB involved.
+Songs live under `songs/` in the same frontend bucket (already publicly
+readable via the existing bucket policy), described by `songs/manifest.json`:
+
+```json
+[
+  { "id": "song-slug", "title": "Song Title", "artist": "Artist", "file": "songs/song-slug.mp3", "cover": "songs/covers/song-slug.jpg" }
+]
+```
+
+The player fetches that manifest and streams each file's `src` directly from
+the same origin (the S3 website endpoint), so there's no CORS setup needed.
+To add a song:
+
+```bash
+FRONTEND_BUCKET=<FrontendBucketNameOutput> python scripts/add_song.py
+```
+
+It prompts for the local audio file, title, artist, and an optional cover
+image, uploads them to `songs/`, and rewrites `manifest.json` (re-running it
+with the same title replaces that song rather than duplicating it).
 
 ## Guestbook spam mitigation
 
