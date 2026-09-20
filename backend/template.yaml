@@ -1,0 +1,177 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Personal website backend: API Gateway + Lambda + DynamoDB for a blog and
+  guestbook, plus an S3 bucket for the static frontend.
+
+Parameters:
+  FrontendBucketName:
+    Type: String
+    Description: Globally unique S3 bucket name to host the static frontend.
+  CorsAllowOrigin:
+    Type: String
+    Default: "*"
+    Description: >
+      Allowed origin for API responses. Set to your S3 website URL (or custom
+      domain) after the first deploy, then redeploy to lock it down.
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures: [arm64]
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+  PostsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-posts"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  GuestbookTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-guestbook"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  WebsiteApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: !Sub "'${CorsAllowOrigin}'"
+
+  PostsListFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: posts_list.handler
+      Environment:
+        Variables:
+          POSTS_TABLE: !Ref PostsTable
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref PostsTable
+      Events:
+        List:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /posts
+            Method: GET
+
+  PostsGetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: posts_get.handler
+      Environment:
+        Variables:
+          POSTS_TABLE: !Ref PostsTable
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref PostsTable
+      Events:
+        Get:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /posts/{id}
+            Method: GET
+
+  GuestbookListFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: guestbook_list.handler
+      Environment:
+        Variables:
+          GUESTBOOK_TABLE: !Ref GuestbookTable
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref GuestbookTable
+      Events:
+        List:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /guestbook
+            Method: GET
+
+  GuestbookCreateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: guestbook_create.handler
+      Environment:
+        Variables:
+          GUESTBOOK_TABLE: !Ref GuestbookTable
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref GuestbookTable
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /guestbook
+            Method: POST
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref FrontendBucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: 404.html
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the API. Paste into frontend/js/config.js
+    Value: !Sub "https://${WebsiteApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  WebsiteURL:
+    Description: S3 static website URL (HTTP only; add CloudFront for HTTPS/custom domain later)
+    Value: !GetAtt FrontendBucket.WebsiteURL
+  FrontendBucketNameOutput:
+    Description: Name of the S3 bucket to sync the frontend files to
+    Value: !Ref FrontendBucket
+  PostsTableName:
+    Value: !Ref PostsTable
+  GuestbookTableName:
+    Value: !Ref GuestbookTable

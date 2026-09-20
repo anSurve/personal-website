@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Word Counter - Aniket Surve</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='43' font-family='Arial' font-size='28' font-weight='700' fill='white' text-anchor='middle'%3EAS%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="site-title" href="../../index.html">
+        <span class="avatar brand-mark">AS</span>
+        Aniket Surve
+      </a>
+      <nav class="site-nav">
+        <a href="../../index.html">Home</a>
+        <a href="../../blog/index.html">Blog</a>
+        <a href="../../guestbook/index.html">Guestbook</a>
+        <a href="../index.html" class="active">Apps</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <p><a href="../index.html">&larr; Back to apps</a></p>
+      <h1>Word Counter</h1>
+      <textarea id="input" rows="10" style="width:100%" placeholder="Type or paste text here..."></textarea>
+      <p id="stats" class="meta"></p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>&copy; <span id="year"></span> Aniket Surve</span>
+      <div class="social-links">
+        <a href="https://github.com/anSurve" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">GH</a>
+        <a href="https://www.linkedin.com/in/aniket-surve/" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">in</a>
+        <a href="mailto:aniket.surve.jobs@gmail.com" aria-label="Email" title="Email">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            <polyline points="2 7 12 13 22 7"></polyline>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const input = document.getElementById("input");
+    const stats = document.getElementById("stats");
+
+    function update() {
+      const text = input.value;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const chars = text.length;
+      const sentences = text.trim() ? (text.match(/[.!?]+/g) || []).length : 0;
+      stats.textContent = `${words} words · ${chars} characters · ${sentences} sentences`;
+    }
+
+    input.addEventListener("input", update);
+    update();
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guestbook - Aniket Surve</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='43' font-family='Arial' font-size='28' font-weight='700' fill='white' text-anchor='middle'%3EAS%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="site-title" href="../index.html">
+        <span class="avatar brand-mark">AS</span>
+        Aniket Surve
+      </a>
+      <nav class="site-nav">
+        <a href="../index.html">Home</a>
+        <a href="../blog/index.html">Blog</a>
+        <a href="index.html" class="active">Guestbook</a>
+        <a href="../apps/index.html">Apps</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Guestbook</h1>
+      <p class="lede">Leave a note &mdash; say hi, ask a question, whatever you like.</p>
+
+      <form id="guestbook-form" class="stack">
+        <div>
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" maxlength="50" required />
+        </div>
+        <div>
+          <label for="message">Message</label>
+          <textarea id="message" name="message" maxlength="500" required></textarea>
+        </div>
+        <!-- Honeypot: hidden from real visitors, bots often fill it in -->
+        <div class="honeypot-field" aria-hidden="true">
+          <label for="website">Website</label>
+          <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+        </div>
+        <button type="submit">Sign guestbook</button>
+        <p id="form-status" class="status-message"></p>
+      </form>
+
+      <h2>Entries</h2>
+      <div id="entries">
+        <p class="empty-state">Loading&hellip;</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>&copy; <span id="year"></span> Aniket Surve</span>
+      <div class="social-links">
+        <a href="https://github.com/anSurve" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">GH</a>
+        <a href="https://www.linkedin.com/in/aniket-surve/" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">in</a>
+        <a href="mailto:aniket.surve.jobs@gmail.com" aria-label="Email" title="Email">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            <polyline points="2 7 12 13 22 7"></polyline>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../js/config.js"></script>
+  <script src="guestbook.js"></script>
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

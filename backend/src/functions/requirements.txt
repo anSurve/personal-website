@@ -1,0 +1,2 @@
+# boto3 is already available in the Lambda Python runtime; add any extra
+# third-party dependencies here and `sam build` will bundle them.
