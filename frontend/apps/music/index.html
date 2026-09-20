@@ -29,8 +29,39 @@
   <main>
     <div class="container">
       <p><a href="../index.html">&larr; Back to apps</a></p>
-      <h1>Music</h1>
+      <div class="page-title-row">
+        <h1>Music</h1>
+        <button id="add-song-toggle" class="btn btn-secondary">+ Add Song</button>
+      </div>
       <p class="lede">Songs streamed straight from S3.</p>
+
+      <form id="add-song-form" class="stack add-song-form" hidden>
+        <div>
+          <label for="song-password">Password</label>
+          <input type="password" id="song-password" name="password" autocomplete="off" required />
+        </div>
+        <div>
+          <label for="song-title">Title</label>
+          <input type="text" id="song-title" name="title" required />
+        </div>
+        <div>
+          <label for="song-artist">Artist</label>
+          <input type="text" id="song-artist" name="artist" />
+        </div>
+        <div>
+          <label for="song-audio">Audio file</label>
+          <input type="file" id="song-audio" name="audio" accept="audio/*" required />
+        </div>
+        <div>
+          <label for="song-cover">Cover image (optional)</label>
+          <input type="file" id="song-cover" name="cover" accept="image/*" />
+        </div>
+        <div class="add-song-actions">
+          <button type="submit" id="add-song-submit">Upload</button>
+          <button type="button" id="add-song-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
+        <p id="add-song-status" class="status-message"></p>
+      </form>
 
       <div id="track-list" class="track-list">
         <p class="empty-state">Loading songs&hellip;</p>
@@ -79,6 +110,7 @@
 
   <audio id="audio-el" preload="metadata"></audio>
 
+  <script src="../../js/config.js"></script>
   <script src="music.js"></script>
 </body>
 </html>

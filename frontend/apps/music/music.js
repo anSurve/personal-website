@@ -156,4 +156,114 @@
   }
 
   loadManifest();
+
+  // --- Add Song form ---
+
+  const addSongToggle = document.getElementById("add-song-toggle");
+  const addSongForm = document.getElementById("add-song-form");
+  const addSongCancel = document.getElementById("add-song-cancel");
+  const addSongSubmit = document.getElementById("add-song-submit");
+  const addSongStatus = document.getElementById("add-song-status");
+
+  function setAddSongStatus(message, type) {
+    addSongStatus.textContent = message;
+    addSongStatus.className = `status-message ${type || ""}`.trim();
+  }
+
+  function toggleAddSongForm(show) {
+    addSongForm.hidden = !show;
+    if (show) {
+      setAddSongStatus("", "");
+      document.getElementById("song-title").focus();
+    }
+  }
+
+  addSongToggle.addEventListener("click", () => toggleAddSongForm(addSongForm.hidden));
+  addSongCancel.addEventListener("click", () => {
+    addSongForm.reset();
+    toggleAddSongForm(false);
+  });
+
+  async function uploadToPresignedUrl(url, file) {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+  }
+
+  addSongForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const password = document.getElementById("song-password").value;
+    const title = document.getElementById("song-title").value.trim();
+    const artist = document.getElementById("song-artist").value.trim();
+    const audioFile = document.getElementById("song-audio").files[0];
+    const coverFile = document.getElementById("song-cover").files[0];
+
+    if (!title || !audioFile) {
+      setAddSongStatus("Title and an audio file are required.", "error");
+      return;
+    }
+
+    addSongSubmit.disabled = true;
+
+    try {
+      setAddSongStatus("Requesting upload URL...", "");
+      const urlRes = await fetch(`${window.API_BASE_URL}/songs/upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          title,
+          filename: audioFile.name,
+          contentType: audioFile.type,
+          coverFilename: coverFile ? coverFile.name : undefined,
+          coverContentType: coverFile ? coverFile.type : undefined,
+        }),
+      });
+
+      if (!urlRes.ok) {
+        const err = await urlRes.json().catch(() => ({}));
+        throw new Error(err.message || `Request failed (${urlRes.status})`);
+      }
+
+      const { slug, audioKey, audioUploadUrl, coverKey, coverUploadUrl } = await urlRes.json();
+
+      setAddSongStatus("Uploading audio...", "");
+      await uploadToPresignedUrl(audioUploadUrl, audioFile);
+
+      if (coverFile && coverUploadUrl) {
+        setAddSongStatus("Uploading cover...", "");
+        await uploadToPresignedUrl(coverUploadUrl, coverFile);
+      }
+
+      setAddSongStatus("Saving...", "");
+      const confirmRes = await fetch(`${window.API_BASE_URL}/songs/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, slug, title, artist, audioKey, coverKey }),
+      });
+
+      if (!confirmRes.ok) {
+        const err = await confirmRes.json().catch(() => ({}));
+        throw new Error(err.message || `Request failed (${confirmRes.status})`);
+      }
+
+      const entry = await confirmRes.json();
+      songs = songs.filter((s) => s.id !== entry.id);
+      songs.push(entry);
+      renderTrackList();
+
+      addSongForm.reset();
+      setAddSongStatus(`Added "${entry.title}".`, "success");
+      setTimeout(() => toggleAddSongForm(false), 1200);
+    } catch (err) {
+      console.error(err);
+      setAddSongStatus(err.message || "Something went wrong.", "error");
+    } finally {
+      addSongSubmit.disabled = false;
+    }
+  });
 })();

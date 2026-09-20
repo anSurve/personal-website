@@ -13,7 +13,9 @@ backend/
     posts_get.py          GET  /posts/{id}
     guestbook_list.py     GET  /guestbook
     guestbook_create.py   POST /guestbook
-    lib/                  shared helpers (dynamo client, response formatting)
+    songs_upload_url.py   POST /songs/upload-url (password-gated, returns presigned S3 PUT URLs)
+    songs_confirm.py      POST /songs/confirm    (password-gated, updates songs/manifest.json)
+    lib/                  shared helpers (dynamo client, response formatting, password check)
 frontend/
   index.html, css/, js/   home page + shared styles/config
   blog/                   blog list + single post pages
@@ -65,8 +67,13 @@ Update `frontend/js/config.js` with the `ApiUrl` from above, then sync the
 files to S3 (run from the repo root):
 
 ```bash
-aws s3 sync frontend s3://<FrontendBucketNameOutput> --delete
+aws s3 sync frontend s3://<FrontendBucketNameOutput> --delete --exclude "songs/*"
 ```
+
+> **Always include `--exclude "songs/*"`.** Songs and `manifest.json` live
+> directly in the bucket, not in the local `frontend/` folder — a sync with
+> `--delete` and no exclude will wipe them, since as far as `aws s3 sync` is
+> concerned they're "extra" files that don't exist locally.
 
 Visit the `WebsiteURL` output to see the site live.
 
@@ -97,9 +104,9 @@ Lambda/table pair in `template.yaml`.
 
 ## Music player
 
-`frontend/apps/music/` is an S3-only app — no Lambda or DynamoDB involved.
-Songs live under `songs/` in the same frontend bucket (already publicly
-readable via the existing bucket policy), described by `songs/manifest.json`:
+`frontend/apps/music/` plays songs stored under `songs/` in the same frontend
+bucket (already publicly readable via the existing bucket policy), described
+by `songs/manifest.json`:
 
 ```json
 [
@@ -108,8 +115,33 @@ readable via the existing bucket policy), described by `songs/manifest.json`:
 ```
 
 The player fetches that manifest and streams each file's `src` directly from
-the same origin (the S3 website endpoint), so there's no CORS setup needed.
-To add a song:
+the same origin (the S3 website endpoint) — no CORS setup needed for
+*playback*.
+
+There are two ways to add a song:
+
+**1. The "+ Add Song" button on the page itself.** It's password-gated: the
+browser calls `POST /songs/upload-url` (Lambda checks the password, returns
+short-lived presigned S3 PUT URLs), uploads the audio/cover straight to S3
+using those URLs, then calls `POST /songs/confirm` (password checked again)
+to append the entry to `manifest.json`. No AWS credentials ever touch the
+browser.
+
+To set the password, generate a SHA-256 hash and pass it at deploy time —
+**never commit the real hash to `template.yaml`'s `Default:`, since this repo
+is public**:
+
+```bash
+python -c "import hashlib, getpass; print(hashlib.sha256(getpass.getpass().encode()).hexdigest())"
+sam deploy --stack-name aniketsurve-website --region us-east-1 --capabilities CAPABILITY_IAM --resolve-s3 \
+  --parameter-overrides SongsUploadPasswordHash=<hash from above>
+```
+
+Leaving `SongsUploadPasswordHash` unset (its default is `""`) disables the
+button's backend — both endpoints reject every request.
+
+**2. `scripts/add_song.py`, run locally** with your own AWS credentials —
+useful for bulk-adding songs without typing the password into a form:
 
 ```bash
 FRONTEND_BUCKET=<FrontendBucketNameOutput> python scripts/add_song.py

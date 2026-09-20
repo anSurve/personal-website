@@ -15,6 +15,16 @@ Parameters:
     Description: >
       Allowed origin for API responses. Set to your S3 website URL (or custom
       domain) after the first deploy, then redeploy to lock it down.
+  SongsUploadPasswordHash:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      SHA-256 hex hash of the password required to use the "Add Song" button
+      on the site. Leave blank to disable the feature. Generate with:
+      python -c "import hashlib, getpass; print(hashlib.sha256(getpass.getpass().encode()).hexdigest())"
+      Pass this via --parameter-overrides at deploy time -- never commit a
+      real hash as this parameter's Default, since this repo is public.
 
 Globals:
   Function:
@@ -137,6 +147,63 @@ Resources:
             Path: /guestbook
             Method: POST
 
+  SongsUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: songs_upload_url.handler
+      Environment:
+        Variables:
+          FRONTEND_BUCKET: !Ref FrontendBucketName
+          UPLOAD_PASSWORD_HASH: !Ref SongsUploadPasswordHash
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "${FrontendBucket.Arn}/songs/*"
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /songs/upload-url
+            Method: POST
+
+  SongsConfirmFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: songs_confirm.handler
+      Environment:
+        Variables:
+          FRONTEND_BUCKET: !Ref FrontendBucketName
+          UPLOAD_PASSWORD_HASH: !Ref SongsUploadPasswordHash
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub "${FrontendBucket.Arn}/songs/manifest.json"
+            # GetObject on a missing key returns AccessDenied instead of a
+            # clean 404 unless the caller also has ListBucket -- needed the
+            # very first time, before manifest.json exists.
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt FrontendBucket.Arn
+              Condition:
+                StringLike:
+                  s3:prefix: "songs/*"
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /songs/confirm
+            Method: POST
+
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -149,6 +216,13 @@ Resources:
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: 404.html
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [GET, PUT]
+            AllowedOrigins:
+              - !Ref CorsAllowOrigin
+            AllowedHeaders: ["*"]
+            MaxAge: 3000
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
