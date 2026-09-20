@@ -48,6 +48,11 @@
         <div>
           <label for="song-audio">Audio file</label>
           <input type="file" id="song-audio" name="audio" accept="audio/*" required />
+          <p id="audio-meta-status" class="status-message"></p>
+        </div>
+        <div id="cover-preview" class="cover-preview" hidden>
+          <img id="cover-preview-img" alt="Embedded cover art" />
+          <span>Found cover art in the file &mdash; will be used unless you pick a different image below.</span>
         </div>
         <div>
           <label for="song-cover">Cover image (optional)</label>
@@ -78,6 +83,7 @@
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/jsmediatags@3.9.7/dist/jsmediatags.min.js"></script>
   <script src="../../js/config.js"></script>
   <script src="add-song.js"></script>
   <script>

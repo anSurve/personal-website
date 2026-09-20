@@ -2,11 +2,78 @@
   const form = document.getElementById("add-song-form");
   const submitBtn = document.getElementById("add-song-submit");
   const statusEl = document.getElementById("add-song-status");
+  const audioInput = document.getElementById("song-audio");
+  const titleInput = document.getElementById("song-title");
+  const artistInput = document.getElementById("song-artist");
+  const audioMetaStatus = document.getElementById("audio-meta-status");
+  const coverPreview = document.getElementById("cover-preview");
+  const coverPreviewImg = document.getElementById("cover-preview-img");
+
+  let extractedCoverFile = null;
 
   function setStatus(message, type) {
     statusEl.textContent = message;
     statusEl.className = `status-message ${type || ""}`.trim();
   }
+
+  function extensionForFormat(format) {
+    if (/png/i.test(format)) return "png";
+    if (/gif/i.test(format)) return "gif";
+    return "jpg";
+  }
+
+  function readTags(file) {
+    return new Promise((resolve, reject) => {
+      if (!window.jsmediatags) {
+        reject(new Error("jsmediatags not loaded"));
+        return;
+      }
+      window.jsmediatags.read(file, { onSuccess: resolve, onError: reject });
+    });
+  }
+
+  audioInput.addEventListener("change", async () => {
+    extractedCoverFile = null;
+    coverPreview.hidden = true;
+    audioMetaStatus.textContent = "";
+
+    const file = audioInput.files[0];
+    if (!file) return;
+
+    try {
+      const tag = await readTags(file);
+      const { title, artist, picture } = tag.tags || {};
+      const foundBits = [];
+
+      if (title && !titleInput.value) {
+        titleInput.value = title;
+        foundBits.push("title");
+      }
+      if (artist && !artistInput.value) {
+        artistInput.value = artist;
+        foundBits.push("artist");
+      }
+
+      if (picture && picture.data && picture.data.length) {
+        const bytes = new Uint8Array(picture.data);
+        const format = picture.format && picture.format.startsWith("image/") ? picture.format : `image/${picture.format || "jpeg"}`;
+        const blob = new Blob([bytes], { type: format });
+        extractedCoverFile = new File([blob], `cover.${extensionForFormat(format)}`, { type: format });
+        coverPreviewImg.src = URL.createObjectURL(blob);
+        coverPreview.hidden = false;
+        foundBits.push("cover art");
+      }
+
+      if (foundBits.length) {
+        audioMetaStatus.textContent = `Found ${foundBits.join(", ")} in the file's tags.`;
+        audioMetaStatus.className = "status-message success";
+      }
+    } catch (err) {
+      // No tags, or an unsupported/corrupt tag block -- not an error worth
+      // surfacing, the user can just fill the fields in manually.
+      console.warn("Could not read audio tags:", err);
+    }
+  });
 
   async function uploadToPresignedUrl(url, file) {
     const res = await fetch(url, {
@@ -21,10 +88,10 @@
     event.preventDefault();
 
     const password = document.getElementById("song-password").value;
-    const title = document.getElementById("song-title").value.trim();
-    const artist = document.getElementById("song-artist").value.trim();
-    const audioFile = document.getElementById("song-audio").files[0];
-    const coverFile = document.getElementById("song-cover").files[0];
+    const title = titleInput.value.trim();
+    const artist = artistInput.value.trim();
+    const audioFile = audioInput.files[0];
+    const coverFile = document.getElementById("song-cover").files[0] || extractedCoverFile;
 
     if (!title || !audioFile) {
       setStatus("Title and an audio file are required.", "error");

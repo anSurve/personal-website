@@ -120,12 +120,16 @@ the same origin (the S3 website endpoint) — no CORS setup needed for
 
 There are two ways to add a song:
 
-**1. The "+ Add Song" button on the page itself.** It's password-gated: the
-browser calls `POST /songs/upload-url` (Lambda checks the password, returns
-short-lived presigned S3 PUT URLs), uploads the audio/cover straight to S3
-using those URLs, then calls `POST /songs/confirm` (password checked again)
-to append the entry to `manifest.json`. No AWS credentials ever touch the
-browser.
+**1. The "+ Add Song" button** on the music page links to `apps/music/add.html`,
+a password-gated upload form. Selecting an audio file reads its ID3 tags
+client-side (via [jsmediatags](https://github.com/aadsm/jsmediatags), loaded
+from a CDN) and auto-fills Title/Artist and pulls any embedded cover art —
+without overwriting fields you've already typed, and a manually chosen cover
+image always overrides the embedded one. On submit, the browser calls
+`POST /songs/upload-url` (Lambda checks the password, returns short-lived
+presigned S3 PUT URLs), uploads the audio/cover straight to S3 using those
+URLs, then calls `POST /songs/confirm` (password checked again) to append the
+entry to `manifest.json`. No AWS credentials ever touch the browser.
 
 To set the password, generate a SHA-256 hash and pass it at deploy time —
 **never commit the real hash to `template.yaml`'s `Default:`, since this repo
