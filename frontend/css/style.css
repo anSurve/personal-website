@@ -31,6 +31,14 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  /* Safety net: Safari's flexbox implementation can let a text-heavy flex
+     child refuse to shrink below its unwrapped width (see .role-header),
+     which forces page-wide horizontal scroll. This guarantees it can't. */
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -183,6 +191,10 @@ a {
   gap: 2.5rem;
 }
 
+.hero-content {
+  min-width: 0;
+}
+
 .hero .avatar {
   width: 128px;
   height: 128px;
@@ -292,7 +304,11 @@ a {
 /* Sections */
 
 section.section {
-  padding: 3rem 0;
+  /* longhand, not shorthand: this is combined with .container on the same
+     element, and a shorthand here would win on specificity and wipe out
+     .container's left/right padding, pushing content edge-to-edge */
+  padding-top: 3rem;
+  padding-bottom: 3rem;
 }
 
 section.section + section.section {
@@ -438,6 +454,8 @@ section.section + section.section {
 .timeline-item .role-title {
   font-weight: 600;
   font-size: 1.05rem;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .timeline-item .role-dates {
