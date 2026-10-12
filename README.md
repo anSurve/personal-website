@@ -21,6 +21,7 @@ frontend/
   blog/                   blog list + single post pages
   guestbook/              guestbook form + entries
   apps/                   landing page for small client-side apps (add more here)
+    astrology/            Janma Kundali: Vedic birth chart + readings, computed in-browser
 scripts/
   add_post.py             admin CLI to write a blog post directly into DynamoDB
   add_song.py             admin CLI to upload a song to S3 and update songs/manifest.json
