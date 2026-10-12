@@ -4,3 +4,5 @@ __pycache__/
 .env
 .secrets
 secrets
+youtube_to_mp3.py
+downloads/
