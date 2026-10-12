@@ -915,7 +915,7 @@
   LESSONS.push({
     id: "quiz", title: "Quiz",
     render(root, g) {
-      const best = store.get("ag-quiz-best", null);
+      const best = getBest();
       root.innerHTML = `
         <div><span class="kicker">Lesson 12</span><h2>Check your understanding</h2></div>
         <p class="intro">Ten questions covering the whole course. Pick an answer to see the explanation.${best !== null ? ` Your best score so far: <b>${best}/10</b>.` : ""}</p>
@@ -932,7 +932,7 @@
         answered++;
         const w = $(".why", box); w.hidden = false; w.textContent = (j === ans ? "Correct. " : "Not quite. ") + why;
         $("#score", root).textContent = `Score: ${right} / ${answered}${answered === QUIZ.length ? " — done!" : ""}`;
-        if (answered === QUIZ.length) { store.set("ag-quiz-best", Math.max(right, store.get("ag-quiz-best", 0))); markVisited("quiz"); }
+        if (answered === QUIZ.length) { setBest(Math.max(right, getBest() ?? 0)); markVisited("quiz"); }
       });
       $("#retry", root).addEventListener("click", () => show("quiz", false));
     },
@@ -941,14 +941,29 @@
   // =====================================================================
   // Navigation & progress
   // =====================================================================
-  let visited = new Set(store.get("ag-visited", []));
-  function markVisited(id) { visited.add(id); store.set("ag-visited", [...visited]); renderNav(currentId); schedulePush(); }
-
-  // ---------- Account sync (js/auth.js + /progress API) ----------
-  // Signed out: progress lives in localStorage only. Signed in: merge with the
-  // account on load (union of lessons, best quiz score), then save changes.
+  // Progress is stored per person: signed-out "guest" progress under the plain
+  // keys, an account's progress under keys suffixed with the user id. Signing
+  // in merges guest progress into the account (then clears it); signing out
+  // shows guest progress again and drops the account's copy from this device.
   const APP_ID = "agentic-ai";
   const auth = window.SiteAuth;
+  const GUEST = { visited: "ag-visited", best: "ag-quiz-best" };
+  const currentUser = () => (auth && auth.isSignedIn() && auth.user()) || null;
+  const keyFor = base => { const u = currentUser(); return u ? `${base}:${u.sub}` : base; };
+  const getBest = () => store.get(keyFor(GUEST.best), null);
+  const setBest = v => store.set(keyFor(GUEST.best), v);
+  const saveVisited = () => store.set(keyFor(GUEST.visited), [...visited]);
+  const removeKey = k => { try { localStorage.removeItem(k); } catch (e) {} };
+  function dropAccountCopies() {
+    try {
+      Object.keys(localStorage).filter(k => k.startsWith(GUEST.visited + ":") || k.startsWith(GUEST.best + ":")).forEach(removeKey);
+    } catch (e) {}
+  }
+  if (!currentUser()) dropAccountCopies();
+  let visited = new Set(store.get(keyFor(GUEST.visited), []));
+  function markVisited(id) { visited.add(id); saveVisited(); renderNav(currentId); schedulePush(); }
+
+  // ---------- Account sync (js/auth.js + /progress API) ----------
   let syncState = "off", pushTimer = null;
   function renderSync() {
     const el = $("#syncNote");
@@ -974,21 +989,26 @@
       const res = await auth.apiFetch(`/progress/${APP_ID}`);
       if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
-      const remote = new Set(data.visited || []), remoteBest = data.quizBest ?? -1, localBest = store.get("ag-quiz-best", null) ?? -1;
-      remote.forEach(id => { if (LESSONS.some(l => l.id === id)) visited.add(id); });
-      store.set("ag-visited", [...visited]);
-      if (Math.max(localBest, remoteBest) >= 0) store.set("ag-quiz-best", Math.max(localBest, remoteBest));
+      // Fold in this account's cached progress plus any guest progress made before signing in
+      const guestVisited = store.get(GUEST.visited, []), guestBest = store.get(GUEST.best, null) ?? -1;
+      const remote = new Set(data.visited || []), remoteBest = data.quizBest ?? -1;
+      const localBest = Math.max(getBest() ?? -1, guestBest);
+      [...remote, ...guestVisited].forEach(id => { if (LESSONS.some(l => l.id === id)) visited.add(id); });
+      saveVisited();
+      if (Math.max(localBest, remoteBest) >= 0) setBest(Math.max(localBest, remoteBest));
       renderNav(currentId);
-      // Send up anything this device had that the account did not
+      // Send up anything the account did not have yet
       if ([...visited].some(v => !remote.has(v)) || localBest > remoteBest) await push();
       else { syncState = "synced"; renderSync(); }
+      // Guest progress now belongs to the account, so it no longer shows after signing out
+      if (syncState === "synced") { removeKey(GUEST.visited); removeKey(GUEST.best); }
     } catch (e) { syncState = "error"; renderSync(); }
   }
   async function push() {
     if (!auth || !auth.isSignedIn()) return;
     syncState = "saving"; renderSync();
     try {
-      const res = await auth.apiFetch(`/progress/${APP_ID}`, { method: "PUT", body: JSON.stringify({ visited: [...visited], quizBest: store.get("ag-quiz-best", null) }) });
+      const res = await auth.apiFetch(`/progress/${APP_ID}`, { method: "PUT", body: JSON.stringify({ visited: [...visited], quizBest: getBest() }) });
       if (!res.ok) throw new Error(String(res.status));
       syncState = "synced";
     } catch (e) { syncState = "error"; }
@@ -999,7 +1019,13 @@
     clearTimeout(pushTimer);
     pushTimer = setTimeout(push, 800);
   }
-  window.addEventListener("siteauth:change", pull);
+  // Sign-in or sign-out in this or another tab: switch to that person's progress
+  window.addEventListener("siteauth:change", () => {
+    if (!currentUser()) dropAccountCopies();
+    visited = new Set(store.get(keyFor(GUEST.visited), []));
+    renderNav(currentId);
+    pull();
+  });
   let currentId = null;
   function renderNav(id) {
     $("#lessonList").innerHTML = LESSONS.map(l => `<li><a href="#${l.id}" class="${visited.has(l.id) ? "done" : ""}"${l.id === id ? ' aria-current="page"' : ""}>${esc(l.title)}</a></li>`).join("");
@@ -1017,7 +1043,7 @@
     const prev = LESSONS[idx - 1], next = LESSONS[idx + 1];
     root.insertAdjacentHTML("beforeend", `<div class="lesson-nav">${prev ? `<a class="btn" href="#${prev.id}">← ${esc(prev.title)}</a>` : "<span></span>"}${next ? `<a class="btn primary" href="#${next.id}">${esc(next.title)} →</a>` : ""}</div>`);
     if (lesson.id !== "quiz" && !visited.has(lesson.id)) { visited.add(lesson.id); schedulePush(); }
-    store.set("ag-visited", [...visited]);
+    saveVisited();
     renderNav(lesson.id);
     document.title = `${lesson.title} · Agentic AI Explained - Aniket Surve`;
     if (scroll) { root.scrollIntoView({ block: "start", behavior: reduceMotion() ? "auto" : "smooth" }); root.focus({ preventScroll: true }); }
