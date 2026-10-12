@@ -13,14 +13,23 @@ backend/
     posts_get.py          GET  /posts/{id}
     guestbook_list.py     GET  /guestbook
     guestbook_create.py   POST /guestbook
-    lib/                  shared helpers (dynamo client, response formatting)
+    songs_upload_url.py   POST /songs/upload-url (password-gated, returns presigned S3 PUT URLs)
+    songs_confirm.py      POST /songs/confirm    (password-gated, updates songs/manifest.json)
+    lib/                  shared helpers (dynamo client, response formatting, password check)
 frontend/
   index.html, css/, js/   home page + shared styles/config
   blog/                   blog list + single post pages
   guestbook/              guestbook form + entries
   apps/                   landing page for small client-side apps (add more here)
+    astrology/            Janma Kundali: Vedic birth chart + readings, computed in-browser
+    anatomy/              3D bones + muscles explorer (three.js, BodyParts3D models)
+    circulation/          3D heart, arteries, veins + hormone routes (reuses anatomy's bones.glb)
+    agentic-ai/           12-lesson interactive course on AI agents (vanilla JS + SVG, no model calls)
 scripts/
   add_post.py             admin CLI to write a blog post directly into DynamoDB
+  add_song.py             admin CLI to upload a song to S3 and update songs/manifest.json
+  anatomy/                rebuild the anatomy app's models from BodyParts3D
+  circulation/            rebuild the circulation app's models from BodyParts3D
 ```
 
 There is intentionally **no public "create post" endpoint** — posts are added
@@ -60,22 +69,75 @@ After it finishes, note the outputs (also available anytime via
 
 ## Deploy the frontend
 
-Update `frontend/js/config.js` with the `ApiUrl` from above, then sync the
-files to S3 (run from the repo root):
+Update `frontend/js/config.js` with the `ApiUrl`, `AuthDomain`,
+`UserPoolClientId` and `SiteURL` outputs from above, then sync the files to S3
+and clear CloudFront's cache (run from the repo root):
 
 ```bash
-aws s3 sync frontend s3://<FrontendBucketNameOutput> --delete
+aws s3 sync frontend s3://<FrontendBucketNameOutput> --delete --exclude "songs/*" --cache-control "no-cache"
+aws cloudfront create-invalidation --distribution-id <DistributionId> --paths "/*"
 ```
 
-Visit the `WebsiteURL` output to see the site live.
+> **Always include `--exclude "songs/*"`.** Songs and `manifest.json` live
+> directly in the bucket, not in the local `frontend/` folder — a sync with
+> `--delete` and no exclude will wipe them, since as far as `aws s3 sync` is
+> concerned they're "extra" files that don't exist locally.
+
+`--cache-control "no-cache"` makes browsers check for a newer copy on every
+visit, so a deploy never leaves anyone with a new page and an old script.
+
+The site is served over HTTPS at the `SiteURL` output (CloudFront in front of
+the bucket). The old `WebsiteURL` (`http://…s3-website…`) still works, but
+sign-in only works on the HTTPS address; the "Sign in" button there sends
+people to `SiteURL`.
 
 Once you know the site's URL, set `CorsAllowOrigin`'s `Default:` in
 `template.yaml` to that URL and redeploy to lock the API down to your own
 frontend instead of `*`.
 
-> The S3 website endpoint is HTTP-only. For HTTPS and a custom domain, put
-> CloudFront + an ACM certificate (+ Route 53, if you buy a domain) in front
-> of the bucket later — not required to get the site working.
+## Sign-in (Cognito) and user progress
+
+Accounts live in an Amazon Cognito user pool (`UserPoolId` output). People
+sign up and sign in on Cognito's hosted page (`AuthDomain`) with
+email/password, or with Google once it is configured; `frontend/js/auth.js`
+runs the OAuth authorization-code + PKCE flow, keeps the tokens in
+`localStorage`, adds the Sign in button / user menu to every page, and exposes
+`window.SiteAuth` for apps. `frontend/auth/callback.html` is where Cognito
+sends people back to.
+
+Signed-in apps store per-user progress through `GET`/`PUT /progress/{app}`
+(`progress.py`, `ProgressTable`). Those routes use a Cognito authorizer, so
+the user id always comes from a verified token; saves are merged (union of
+lessons, best quiz score) so two devices never overwrite each other. Allowed
+apps are listed in `APPS` in `progress.py` — add an id there before another
+app can store progress. The user pool and progress table have
+`DeletionPolicy: Retain`, so deleting the stack does not delete accounts.
+
+Cognito's built-in email sender (used for verification codes and password
+resets) is limited to about 50 emails a day; switch the user pool to Amazon
+SES if the site outgrows that.
+
+### Turning on "Continue with Google"
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) → APIs &
+   Services → OAuth consent screen, set up an **External** app (name, support
+   email; scopes `openid`, `email`, `profile`) and publish it.
+2. Credentials → Create credentials → **OAuth client ID** → *Web application*:
+   - Authorized JavaScript origins: `https://<AuthDomain>`
+   - Authorized redirect URIs: the `GoogleRedirectURI` output
+     (`https://<AuthDomain>/oauth2/idpresponse`)
+3. Deploy with the client ID and secret (never commit them; this repo is
+   public). Other parameters keep their previous values:
+
+```bash
+cd backend
+sam build
+sam deploy --stack-name aniketsurve-website --region us-east-1 --capabilities CAPABILITY_IAM --resolve-s3   --parameter-overrides GoogleClientId=<client id> GoogleClientSecret=<client secret>
+```
+
+The hosted sign-in page then shows a Google button alongside email/password.
+Later deploys without `--parameter-overrides` keep the Google settings
+(SAM reuses previous parameter values for anything not overridden).
 
 ## Adding blog posts
 
@@ -93,6 +155,103 @@ Each app is just a folder under `frontend/apps/` with its own `index.html`
 `frontend/apps/index.html`. Keep them client-side only unless one specifically
 needs persistence — then it can call the same API Gateway + add a new
 Lambda/table pair in `template.yaml`.
+
+## Human Anatomy app
+
+`frontend/apps/anatomy/` renders the bones and muscles of
+[BodyParts3D](https://dbarchive.biosciencedbc.jp/en/bodyparts3d/) (CC BY 4.0,
+credited on the page) with three.js loaded from a CDN. Everything it needs is
+committed: `models/bones.glb` and `models/muscles.glb` (~4 MB, meshopt
+compressed, one mesh per structure named by its FMA id), `parts.json` (name,
+side, region, kind per mesh) and `info.js` (origin/insertion/action/nerve or
+description/joints/notes per structure).
+
+To regenerate the models (e.g. with more or less detail), download
+`isa_BP3D_4.0_obj_99.zip` plus the `isa_*` and `partof_*` index files from the
+BodyParts3D site into one folder, then:
+
+```bash
+pip install numpy fast-simplification trimesh
+python scripts/anatomy/catalog.py <data-dir> catalog.json
+python scripts/anatomy/build_meshes.py <data-dir>/isa_BP3D_4.0_obj_99.zip catalog.json <out-dir> 0.25 0.25
+npx @gltf-transform/cli@4.1.1 meshopt <out-dir>/bones.raw.glb frontend/apps/anatomy/models/bones.glb
+npx @gltf-transform/cli@4.1.1 meshopt <out-dir>/muscles.raw.glb frontend/apps/anatomy/models/muscles.glb
+```
+
+`parts.json` is `catalog.json` with the element lists dropped and keys
+shortened (`id n b w s c r k`). The last two arguments of `build_meshes.py`
+are the fraction of triangles kept for bones and muscles.
+
+## Circulation app
+
+`frontend/apps/circulation/` is a sister app to Human Anatomy: arteries,
+veins, heart, hormone glands and context organs from BodyParts3D, plus
+step-by-step hormone routes (`routes.js`). It shares `../anatomy/anatomy.css`
+and loads `../anatomy/models/bones.glb` as a faint skeleton, so the two apps
+must be built in the same coordinate frame (the constants at the top of
+`scripts/circulation/build_meshes.py`). Rebuild with the same data folder:
+
+```bash
+python scripts/circulation/catalog.py <data-dir> vcatalog.json
+python scripts/circulation/build_meshes.py <data-dir>/isa_BP3D_4.0_obj_99.zip vcatalog.json <out-dir> frontend/apps/circulation/parts.json
+for f in arteries veins organs; do npx @gltf-transform/cli@4.1.1 meshopt <out-dir>/$f.raw.glb frontend/apps/circulation/models/$f.glb; done
+```
+
+Route steps reference structures by name (`"renal vein~left"`), so check
+`routes.js` still resolves after a rebuild.
+
+## Music player
+
+`frontend/apps/music/` plays songs stored under `songs/` in the same frontend
+bucket (already publicly readable via the existing bucket policy), described
+by `songs/manifest.json`:
+
+```json
+[
+  { "id": "song-slug", "title": "Song Title", "artist": "Artist", "file": "songs/song-slug.mp3", "cover": "songs/covers/song-slug.jpg" }
+]
+```
+
+The player fetches that manifest and streams each file's `src` directly from
+the same origin (the S3 website endpoint) — no CORS setup needed for
+*playback*.
+
+There are two ways to add a song:
+
+**1. The "+ Add Song" button** on the music page links to `apps/music/add.html`,
+a password-gated upload form. Selecting an audio file reads its ID3 tags
+client-side (via [jsmediatags](https://github.com/aadsm/jsmediatags), loaded
+from a CDN) and auto-fills Title/Artist and pulls any embedded cover art —
+without overwriting fields you've already typed, and a manually chosen cover
+image always overrides the embedded one. On submit, the browser calls
+`POST /songs/upload-url` (Lambda checks the password, returns short-lived
+presigned S3 PUT URLs), uploads the audio/cover straight to S3 using those
+URLs, then calls `POST /songs/confirm` (password checked again) to append the
+entry to `manifest.json`. No AWS credentials ever touch the browser.
+
+To set the password, generate a SHA-256 hash and pass it at deploy time —
+**never commit the real hash to `template.yaml`'s `Default:`, since this repo
+is public**:
+
+```bash
+python -c "import hashlib, getpass; print(hashlib.sha256(getpass.getpass().encode()).hexdigest())"
+sam deploy --stack-name aniketsurve-website --region us-east-1 --capabilities CAPABILITY_IAM --resolve-s3 \
+  --parameter-overrides SongsUploadPasswordHash=<hash from above>
+```
+
+Leaving `SongsUploadPasswordHash` unset (its default is `""`) disables the
+button's backend — both endpoints reject every request.
+
+**2. `scripts/add_song.py`, run locally** with your own AWS credentials —
+useful for bulk-adding songs without typing the password into a form:
+
+```bash
+FRONTEND_BUCKET=<FrontendBucketNameOutput> python scripts/add_song.py
+```
+
+It prompts for the local audio file, title, artist, and an optional cover
+image, uploads them to `songs/`, and rewrites `manifest.json` (re-running it
+with the same title replaces that song rather than duplicating it).
 
 ## Guestbook spam mitigation
 

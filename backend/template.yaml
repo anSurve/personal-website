@@ -15,6 +15,39 @@ Parameters:
     Description: >
       Allowed origin for API responses. Set to your S3 website URL (or custom
       domain) after the first deploy, then redeploy to lock it down.
+  SongsUploadPasswordHash:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      SHA-256 hex hash of the password required to use the "Add Song" button
+      on the site. Leave blank to disable the feature. Generate with:
+      python -c "import hashlib, getpass; print(hashlib.sha256(getpass.getpass().encode()).hexdigest())"
+      Pass this via --parameter-overrides at deploy time -- never commit a
+      real hash as this parameter's Default, since this repo is public.
+  AuthDomainPrefix:
+    Type: String
+    Default: aniketsurve-auth
+    Description: >
+      Prefix for the Cognito sign-in domain
+      (<prefix>.auth.<region>.amazoncognito.com). Must be globally unique.
+  GoogleClientId:
+    Type: String
+    Default: ""
+    Description: >
+      OAuth client ID from Google Cloud Console. Leave blank to offer only
+      email/password sign-in; set it (with GoogleClientSecret) to add
+      "Continue with Google".
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      OAuth client secret matching GoogleClientId. Pass via
+      --parameter-overrides; never commit it, since this repo is public.
+
+Conditions:
+  HasGoogle: !Not [!Equals [!Ref GoogleClientId, ""]]
 
 Globals:
   Function:
@@ -48,14 +81,200 @@ Resources:
         - AttributeName: id
           KeyType: HASH
 
+  # Per-user, per-app progress (e.g. lessons visited in the Agentic AI course).
+  # Retained on stack deletion so users' progress is never lost by accident.
+  ProgressTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${AWS::StackName}-progress"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: app
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: app
+          KeyType: RANGE
+
+  # ---- Sign-in: Cognito user pool with email/password and optional Google ----
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub "${AWS::StackName}-users"
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireUppercase: false
+          RequireSymbols: false
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref AuthDomainPrefix
+      UserPoolId: !Ref UserPool
+      ManagedLoginVersion: 1
+
+  GoogleIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Condition: HasGoogle
+    Properties:
+      UserPoolId: !Ref UserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: openid email profile
+      AttributeMapping:
+        email: email
+        email_verified: email_verified
+        name: name
+        picture: picture
+
+  # Public browser client: authorization code flow with PKCE, no client secret.
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: website
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      CallbackURLs:
+        - !Sub "https://${SiteDistribution.DomainName}/auth/callback.html"
+        - http://localhost:8765/auth/callback.html
+      LogoutURLs:
+        - !Sub "https://${SiteDistribution.DomainName}/auth/callback.html"
+        - http://localhost:8765/auth/callback.html
+      SupportedIdentityProviders: !If
+        - HasGoogle
+        - [COGNITO, !Ref GoogleIdentityProvider]
+        - [COGNITO]
+      ExplicitAuthFlows: [ALLOW_REFRESH_TOKEN_AUTH, ALLOW_USER_SRP_AUTH]
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      IdTokenValidity: 60
+      AccessTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        IdToken: minutes
+        AccessToken: minutes
+        RefreshToken: days
+
+  # ---- HTTPS in front of the S3 website (needed for sign-in) ----
+  SiteCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub "${AWS::StackName}-site"
+        MinTTL: 0
+        DefaultTTL: 300
+        MaxTTL: 86400
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub "${AWS::StackName} website (HTTPS)"
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200
+        Origins:
+          - Id: S3Website
+            # WebsiteURL is http://<bucket>.s3-website-<region>.amazonaws.com
+            DomainName: !Select [2, !Split ["/", !GetAtt FrontendBucket.WebsiteURL]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: http-only
+        DefaultCacheBehavior:
+          TargetOriginId: S3Website
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: !Ref SiteCachePolicy
+
   WebsiteApi:
     Type: AWS::Serverless::Api
     Properties:
       StageName: prod
       Cors:
-        AllowMethods: "'GET,POST,OPTIONS'"
-        AllowHeaders: "'Content-Type'"
+        AllowMethods: "'GET,POST,PUT,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
         AllowOrigin: !Sub "'${CorsAllowOrigin}'"
+      Auth:
+        Authorizers:
+          CognitoAuth:
+            UserPoolArn: !GetAtt UserPool.Arn
+      # Let the browser read 401/403s from the authorizer instead of a CORS error.
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${CorsAllowOrigin}'"
+              Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${CorsAllowOrigin}'"
+              Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+
+  ProgressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: progress.handler
+      Environment:
+        Variables:
+          PROGRESS_TABLE: !Ref ProgressTable
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProgressTable
+      Events:
+        Get:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /progress/{app}
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuth
+        Put:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /progress/{app}
+            Method: PUT
+            Auth:
+              Authorizer: CognitoAuth
 
   PostsListFunction:
     Type: AWS::Serverless::Function
@@ -137,6 +356,63 @@ Resources:
             Path: /guestbook
             Method: POST
 
+  SongsUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: songs_upload_url.handler
+      Environment:
+        Variables:
+          FRONTEND_BUCKET: !Ref FrontendBucketName
+          UPLOAD_PASSWORD_HASH: !Ref SongsUploadPasswordHash
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "${FrontendBucket.Arn}/songs/*"
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /songs/upload-url
+            Method: POST
+
+  SongsConfirmFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/
+      Handler: songs_confirm.handler
+      Environment:
+        Variables:
+          FRONTEND_BUCKET: !Ref FrontendBucketName
+          UPLOAD_PASSWORD_HASH: !Ref SongsUploadPasswordHash
+          CORS_ORIGIN: !Ref CorsAllowOrigin
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub "${FrontendBucket.Arn}/songs/manifest.json"
+            # GetObject on a missing key returns AccessDenied instead of a
+            # clean 404 unless the caller also has ListBucket -- needed the
+            # very first time, before manifest.json exists.
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !GetAtt FrontendBucket.Arn
+              Condition:
+                StringLike:
+                  s3:prefix: "songs/*"
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebsiteApi
+            Path: /songs/confirm
+            Method: POST
+
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -149,6 +425,13 @@ Resources:
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: 404.html
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [GET, PUT]
+            AllowedOrigins:
+              - !Ref CorsAllowOrigin
+            AllowedHeaders: ["*"]
+            MaxAge: 3000
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -172,6 +455,25 @@ Outputs:
   FrontendBucketNameOutput:
     Description: Name of the S3 bucket to sync the frontend files to
     Value: !Ref FrontendBucket
+  SiteURL:
+    Description: HTTPS address of the site (CloudFront). Use this one; sign-in only works here.
+    Value: !Sub "https://${SiteDistribution.DomainName}"
+  DistributionId:
+    Description: CloudFront distribution ID, for cache invalidations after a frontend deploy
+    Value: !Ref SiteDistribution
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Paste into frontend/js/config.js (AUTH_CONFIG.clientId)
+    Value: !Ref UserPoolClient
+  AuthDomain:
+    Description: Paste into frontend/js/config.js (AUTH_CONFIG.domain)
+    Value: !Sub "${AuthDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+  GoogleRedirectURI:
+    Description: Add this as an "Authorized redirect URI" on the Google OAuth client
+    Value: !Sub "https://${AuthDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse"
+  ProgressTableName:
+    Value: !Ref ProgressTable
   PostsTableName:
     Value: !Ref PostsTable
   GuestbookTableName:
