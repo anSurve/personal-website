@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Human Anatomy - Aniket Surve</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='43' font-family='Arial' font-size='28' font-weight='700' fill='white' text-anchor='middle'%3EAS%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../css/style.css" />
+  <link rel="stylesheet" href="anatomy.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="site-title" href="../../index.html">
+        <span class="avatar brand-mark">AS</span>
+        Aniket Surve
+      </a>
+      <nav class="site-nav">
+        <a href="../../index.html">Home</a>
+        <a href="../../blog/index.html">Blog</a>
+        <a href="../../guestbook/index.html">Guestbook</a>
+        <a href="../index.html" class="active">Apps</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="an">
+    <div class="an-wrap">
+      <p class="back"><a href="../index.html">&larr; Back to apps</a></p>
+      <div class="an-head">
+        <h1>Human Anatomy</h1>
+        <p class="lede">Explore the bones and muscles of the human body in 3D. Drag to rotate, scroll or pinch to zoom, and click any structure to learn about it.</p>
+      </div>
+
+      <div class="an-layout">
+        <aside class="an-side" aria-label="Filters and structure list">
+          <div class="an-block">
+            <span class="eyebrow" id="showLabel">Show</span>
+            <div class="seg" role="group" aria-labelledby="showLabel">
+              <button type="button" data-mode="bones" aria-pressed="false">Bones</button>
+              <button type="button" data-mode="muscles" aria-pressed="false">Muscles</button>
+              <button type="button" data-mode="both" aria-pressed="true">Both</button>
+            </div>
+            <label class="check"><input type="checkbox" id="xray"> See-through muscles</label>
+          </div>
+          <div class="an-block">
+            <label class="eyebrow" for="search">Find a structure</label>
+            <input type="search" id="search" placeholder="e.g. femur, biceps" autocomplete="off" spellcheck="false">
+          </div>
+          <nav id="browse" class="browse" aria-label="Structures by region"></nav>
+        </aside>
+
+        <section class="an-stage" aria-label="3D model">
+          <div id="viewer" class="viewer">
+            <div id="loading" class="loading" role="status">Loading 3D model…</div>
+            <div id="hoverLabel" class="hover-label" hidden></div>
+            <div class="views" role="group" aria-label="Camera view">
+              <button type="button" data-view="front">Front</button>
+              <button type="button" data-view="back">Back</button>
+              <button type="button" data-view="left">Left</button>
+              <button type="button" data-view="right">Right</button>
+            </div>
+            <button type="button" id="showAll" class="show-all" hidden>Show everything</button>
+          </div>
+        </section>
+
+        <aside id="detail" class="an-detail" aria-live="polite">
+          <div class="placeholder">
+            <h2>Pick a structure</h2>
+            <p>Click any bone or muscle on the model, or choose one from the list, to see where it is, what it connects to and what it does.</p>
+          </div>
+        </aside>
+      </div>
+
+      <p class="credit">3D models: <a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/" target="_blank" rel="noopener">BodyParts3D</a>, &copy; The Database Center for Life Science, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC Attribution 4.0 International</a> (meshes simplified for the web). A few muscles, including latissimus dorsi, rectus abdominis and the facial and chewing muscles, are not part of that dataset. Notes are for general education, not medical advice.</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>&copy; <span id="year"></span> Aniket Surve</span>
+      <div class="social-links">
+        <a href="https://github.com/anSurve" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">GH</a>
+        <a href="https://www.linkedin.com/in/aniket-surve/" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">in</a>
+        <a href="mailto:aniket.surve.jobs@gmail.com" aria-label="Email" title="Email">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            <polyline points="2 7 12 13 22 7"></polyline>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+  <script src="info.js"></script>
+  <script type="module" src="anatomy.js"></script>
+</body>
+</html>
