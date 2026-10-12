@@ -22,9 +22,13 @@ frontend/
   guestbook/              guestbook form + entries
   apps/                   landing page for small client-side apps (add more here)
     astrology/            Janma Kundali: Vedic birth chart + readings, computed in-browser
+    anatomy/              3D bones + muscles explorer (three.js, BodyParts3D models)
+    circulation/          3D heart, arteries, veins + hormone routes (reuses anatomy's bones.glb)
 scripts/
   add_post.py             admin CLI to write a blog post directly into DynamoDB
   add_song.py             admin CLI to upload a song to S3 and update songs/manifest.json
+  anatomy/                rebuild the anatomy app's models from BodyParts3D
+  circulation/            rebuild the circulation app's models from BodyParts3D
 ```
 
 There is intentionally **no public "create post" endpoint** — posts are added
@@ -102,6 +106,50 @@ Each app is just a folder under `frontend/apps/` with its own `index.html`
 `frontend/apps/index.html`. Keep them client-side only unless one specifically
 needs persistence — then it can call the same API Gateway + add a new
 Lambda/table pair in `template.yaml`.
+
+## Human Anatomy app
+
+`frontend/apps/anatomy/` renders the bones and muscles of
+[BodyParts3D](https://dbarchive.biosciencedbc.jp/en/bodyparts3d/) (CC BY 4.0,
+credited on the page) with three.js loaded from a CDN. Everything it needs is
+committed: `models/bones.glb` and `models/muscles.glb` (~4 MB, meshopt
+compressed, one mesh per structure named by its FMA id), `parts.json` (name,
+side, region, kind per mesh) and `info.js` (origin/insertion/action/nerve or
+description/joints/notes per structure).
+
+To regenerate the models (e.g. with more or less detail), download
+`isa_BP3D_4.0_obj_99.zip` plus the `isa_*` and `partof_*` index files from the
+BodyParts3D site into one folder, then:
+
+```bash
+pip install numpy fast-simplification trimesh
+python scripts/anatomy/catalog.py <data-dir> catalog.json
+python scripts/anatomy/build_meshes.py <data-dir>/isa_BP3D_4.0_obj_99.zip catalog.json <out-dir> 0.25 0.25
+npx @gltf-transform/cli@4.1.1 meshopt <out-dir>/bones.raw.glb frontend/apps/anatomy/models/bones.glb
+npx @gltf-transform/cli@4.1.1 meshopt <out-dir>/muscles.raw.glb frontend/apps/anatomy/models/muscles.glb
+```
+
+`parts.json` is `catalog.json` with the element lists dropped and keys
+shortened (`id n b w s c r k`). The last two arguments of `build_meshes.py`
+are the fraction of triangles kept for bones and muscles.
+
+## Circulation app
+
+`frontend/apps/circulation/` is a sister app to Human Anatomy: arteries,
+veins, heart, hormone glands and context organs from BodyParts3D, plus
+step-by-step hormone routes (`routes.js`). It shares `../anatomy/anatomy.css`
+and loads `../anatomy/models/bones.glb` as a faint skeleton, so the two apps
+must be built in the same coordinate frame (the constants at the top of
+`scripts/circulation/build_meshes.py`). Rebuild with the same data folder:
+
+```bash
+python scripts/circulation/catalog.py <data-dir> vcatalog.json
+python scripts/circulation/build_meshes.py <data-dir>/isa_BP3D_4.0_obj_99.zip vcatalog.json <out-dir> frontend/apps/circulation/parts.json
+for f in arteries veins organs; do npx @gltf-transform/cli@4.1.1 meshopt <out-dir>/$f.raw.glb frontend/apps/circulation/models/$f.glb; done
+```
+
+Route steps reference structures by name (`"renal vein~left"`), so check
+`routes.js` still resolves after a rebuild.
 
 ## Music player
 

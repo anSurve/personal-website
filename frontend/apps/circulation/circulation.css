@@ -1,0 +1,62 @@
+/* Circulation app: extends ../anatomy/anatomy.css (shared .an layout). */
+
+.ci { --an-accent: #b45309; --an-accent-soft: #fef3c7; }
+@media (prefers-color-scheme: dark) {
+  .ci { --an-accent: #fbbf24; --an-accent-soft: #3a2a0c; }
+}
+
+.ci .layers { display: grid; gap: 2px; margin-top: 8px; }
+.ci .layers .check { margin-top: 4px; }
+
+.ci .tabs { display: flex; border-bottom: 1px solid var(--border); }
+.ci .tabs button {
+  flex: 1; font: inherit; font-size: 0.9rem; font-weight: 600; padding: 8px 4px; background: none; color: var(--muted);
+  border: 0; border-bottom: 2px solid transparent; border-radius: 0; cursor: pointer; align-self: stretch;
+}
+.ci .tabs button:hover { color: var(--text); opacity: 1; }
+.ci .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--an-accent); }
+.ci .pane { display: grid; gap: 10px; }
+.ci .pane .eyebrow { margin-bottom: 0; }
+.ci .intro { margin: 0; font-size: 0.88rem; color: var(--muted); line-height: 1.5; }
+
+.route-list { display: grid; gap: 6px; }
+.route-list button {
+  text-align: left; font: inherit; padding: 9px 12px; border-radius: 10px; cursor: pointer; display: grid; gap: 1px;
+  background: var(--card-bg); color: var(--text); border: 1px solid var(--border); align-self: auto;
+}
+.route-list button:hover { border-color: var(--an-accent); opacity: 1; }
+.route-list button[aria-current="true"] { border-color: var(--an-accent); background: var(--an-accent-soft); }
+.route-list b { font-size: 0.93rem; }
+.route-list span { font-size: 0.8rem; color: var(--muted); }
+
+.legend {
+  position: absolute; top: 10px; left: 10px; display: grid; gap: 3px; font-size: 0.75rem; color: var(--text);
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px;
+  pointer-events: none;
+}
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+@media (max-width: 720px) { .legend { font-size: 0.7rem; } }
+
+/* Detail panel extras */
+.ci .hormones { background: color-mix(in srgb, #14b8a6 14%, transparent); border-radius: 10px; padding: 10px 12px; font-size: 0.92rem; line-height: 1.5; }
+.ci .hormones b { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 2px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; counter-reset: step; }
+.steps li button {
+  width: 100%; text-align: left; font: inherit; font-size: 0.9rem; font-weight: 500; padding: 7px 10px 7px 38px; border-radius: 8px;
+  background: none; color: var(--text); border: 1px solid transparent; cursor: pointer; position: relative; align-self: auto;
+}
+.steps li button::before {
+  counter-increment: step; content: counter(step); position: absolute; left: 8px; top: 7px; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border);
+}
+.steps li button:hover { background: var(--bg-soft); opacity: 1; }
+.steps li button[aria-current="step"] { background: var(--an-accent-soft); border-color: var(--an-accent); }
+.steps li button[aria-current="step"]::before { background: var(--an-accent); color: #fff; border-color: transparent; }
+.steps li.done button::before { background: color-mix(in srgb, var(--an-accent) 30%, transparent); color: var(--text); }
+.step-text { margin: 0; line-height: 1.55; }
+.stepper button { font: inherit; font-size: 0.84rem; font-weight: 500; padding: 5px 12px; border-radius: 8px; cursor: pointer; background: var(--bg); color: var(--text); border: 1px solid var(--border); align-self: auto; }
+.stepper button:hover:not(:disabled) { border-color: var(--an-accent); opacity: 1; }
+.stepper button:disabled { opacity: 0.45; cursor: not-allowed; }
+.stepper { display: flex; gap: 6px; align-items: center; }
+.stepper .count { font-size: 0.85rem; color: var(--muted); margin-right: auto; }

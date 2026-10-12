@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Circulation - Aniket Surve</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='43' font-family='Arial' font-size='28' font-weight='700' fill='white' text-anchor='middle'%3EAS%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../css/style.css" />
+  <link rel="stylesheet" href="../anatomy/anatomy.css" />
+  <link rel="stylesheet" href="circulation.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="site-title" href="../../index.html">
+        <span class="avatar brand-mark">AS</span>
+        Aniket Surve
+      </a>
+      <nav class="site-nav">
+        <a href="../../index.html">Home</a>
+        <a href="../../blog/index.html">Blog</a>
+        <a href="../../guestbook/index.html">Guestbook</a>
+        <a href="../index.html" class="active">Apps</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="an ci">
+    <div class="an-wrap">
+      <p class="back"><a href="../index.html">&larr; Back to apps</a></p>
+      <div class="an-head">
+        <h1>Circulation</h1>
+        <p class="lede">The heart, arteries and veins in 3D, and the routes hormones take through them. Drag to rotate, scroll or pinch to zoom, and click any vessel to learn about it.</p>
+      </div>
+
+      <div class="an-layout">
+        <aside class="an-side" aria-label="Filters and lists">
+          <div class="an-block">
+            <span class="eyebrow" id="showLabel">Show</span>
+            <div class="seg" role="group" aria-labelledby="showLabel">
+              <button type="button" data-mode="arteries" aria-pressed="false">Arteries</button>
+              <button type="button" data-mode="veins" aria-pressed="false">Veins</button>
+              <button type="button" data-mode="both" aria-pressed="true">Both</button>
+            </div>
+            <div class="layers">
+              <label class="check"><input type="checkbox" data-layer="heart" checked> Heart</label>
+              <label class="check"><input type="checkbox" data-layer="gland" checked> Hormone glands</label>
+              <label class="check"><input type="checkbox" data-layer="organ" checked> Organs</label>
+              <label class="check"><input type="checkbox" data-layer="skeleton" checked> Skeleton outline</label>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Side panel">
+            <button type="button" role="tab" id="tabExplore" aria-controls="paneExplore" aria-selected="true">Explore</button>
+            <button type="button" role="tab" id="tabRoutes" aria-controls="paneRoutes" aria-selected="false">Hormone routes</button>
+          </div>
+          <div id="paneExplore" role="tabpanel" aria-labelledby="tabExplore" class="pane">
+            <label class="eyebrow" for="search">Find a vessel or organ</label>
+            <input type="search" id="search" placeholder="e.g. aorta, portal vein" autocomplete="off" spellcheck="false">
+            <nav id="browse" class="browse" aria-label="Structures by region"></nav>
+          </div>
+          <div id="paneRoutes" role="tabpanel" aria-labelledby="tabRoutes" class="pane" hidden>
+            <p class="intro">Hormones have no vessels of their own: glands release them straight into the blood, and the circulation carries them everywhere. Two routes are special <em>portal systems</em>, where blood passes through a second organ before returning to the heart: the hepatic portal vein (pancreas and gut → liver) and the tiny hypothalamus → pituitary portal vessels.</p>
+            <div id="routeList" class="route-list"></div>
+          </div>
+        </aside>
+
+        <section class="an-stage" aria-label="3D model">
+          <div id="viewer" class="viewer">
+            <div id="loading" class="loading" role="status">Loading 3D model…</div>
+            <div id="hoverLabel" class="hover-label" hidden></div>
+            <div class="legend" aria-label="Colour key">
+              <span><i style="background:#c62828"></i>Oxygen-rich blood</span>
+              <span><i style="background:#3b5bdb"></i>Oxygen-poor blood</span>
+              <span><i style="background:#8e44ad"></i>Portal (gut → liver)</span>
+              <span><i style="background:#14b8a6"></i>Hormone gland</span>
+            </div>
+            <div class="views" role="group" aria-label="Camera view">
+              <button type="button" data-view="front">Front</button>
+              <button type="button" data-view="back">Back</button>
+              <button type="button" data-view="left">Left</button>
+              <button type="button" data-view="right">Right</button>
+            </div>
+            <button type="button" id="showAll" class="show-all" hidden>Show everything</button>
+          </div>
+        </section>
+
+        <aside id="detail" class="an-detail" aria-live="polite"></aside>
+      </div>
+
+      <p class="credit">3D models: <a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/" target="_blank" rel="noopener">BodyParts3D</a>, &copy; The Database Center for Life Science, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC Attribution 4.0 International</a> (meshes simplified for the web). The model is male and does not include the thyroid gland, ovaries, the brain's venous sinuses or the tiny pituitary portal vessels; hormone routes describe those steps in words. Colours follow the textbook convention (red oxygen-rich, blue oxygen-poor), so the pulmonary arteries are blue and pulmonary veins red. Notes are for general education, not medical advice.</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>&copy; <span id="year"></span> Aniket Surve</span>
+      <div class="social-links">
+        <a href="https://github.com/anSurve" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">GH</a>
+        <a href="https://www.linkedin.com/in/aniket-surve/" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn">in</a>
+        <a href="mailto:aniket.surve.jobs@gmail.com" aria-label="Email" title="Email">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            <polyline points="2 7 12 13 22 7"></polyline>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+  <script src="info.js"></script>
+  <script src="routes.js"></script>
+  <script type="module" src="circulation.js"></script>
+</body>
+</html>
