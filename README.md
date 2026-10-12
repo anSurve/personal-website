@@ -24,6 +24,7 @@ frontend/
     astrology/            Janma Kundali: Vedic birth chart + readings, computed in-browser
     anatomy/              3D bones + muscles explorer (three.js, BodyParts3D models)
     circulation/          3D heart, arteries, veins + hormone routes (reuses anatomy's bones.glb)
+    agentic-ai/           12-lesson interactive course on AI agents (vanilla JS + SVG, no model calls)
 scripts/
   add_post.py             admin CLI to write a blog post directly into DynamoDB
   add_song.py             admin CLI to upload a song to S3 and update songs/manifest.json
@@ -68,11 +69,13 @@ After it finishes, note the outputs (also available anytime via
 
 ## Deploy the frontend
 
-Update `frontend/js/config.js` with the `ApiUrl` from above, then sync the
-files to S3 (run from the repo root):
+Update `frontend/js/config.js` with the `ApiUrl`, `AuthDomain`,
+`UserPoolClientId` and `SiteURL` outputs from above, then sync the files to S3
+and clear CloudFront's cache (run from the repo root):
 
 ```bash
-aws s3 sync frontend s3://<FrontendBucketNameOutput> --delete --exclude "songs/*"
+aws s3 sync frontend s3://<FrontendBucketNameOutput> --delete --exclude "songs/*" --cache-control "no-cache"
+aws cloudfront create-invalidation --distribution-id <DistributionId> --paths "/*"
 ```
 
 > **Always include `--exclude "songs/*"`.** Songs and `manifest.json` live
@@ -80,15 +83,61 @@ aws s3 sync frontend s3://<FrontendBucketNameOutput> --delete --exclude "songs/*
 > `--delete` and no exclude will wipe them, since as far as `aws s3 sync` is
 > concerned they're "extra" files that don't exist locally.
 
-Visit the `WebsiteURL` output to see the site live.
+`--cache-control "no-cache"` makes browsers check for a newer copy on every
+visit, so a deploy never leaves anyone with a new page and an old script.
+
+The site is served over HTTPS at the `SiteURL` output (CloudFront in front of
+the bucket). The old `WebsiteURL` (`http://…s3-website…`) still works, but
+sign-in only works on the HTTPS address; the "Sign in" button there sends
+people to `SiteURL`.
 
 Once you know the site's URL, set `CorsAllowOrigin`'s `Default:` in
 `template.yaml` to that URL and redeploy to lock the API down to your own
 frontend instead of `*`.
 
-> The S3 website endpoint is HTTP-only. For HTTPS and a custom domain, put
-> CloudFront + an ACM certificate (+ Route 53, if you buy a domain) in front
-> of the bucket later — not required to get the site working.
+## Sign-in (Cognito) and user progress
+
+Accounts live in an Amazon Cognito user pool (`UserPoolId` output). People
+sign up and sign in on Cognito's hosted page (`AuthDomain`) with
+email/password, or with Google once it is configured; `frontend/js/auth.js`
+runs the OAuth authorization-code + PKCE flow, keeps the tokens in
+`localStorage`, adds the Sign in button / user menu to every page, and exposes
+`window.SiteAuth` for apps. `frontend/auth/callback.html` is where Cognito
+sends people back to.
+
+Signed-in apps store per-user progress through `GET`/`PUT /progress/{app}`
+(`progress.py`, `ProgressTable`). Those routes use a Cognito authorizer, so
+the user id always comes from a verified token; saves are merged (union of
+lessons, best quiz score) so two devices never overwrite each other. Allowed
+apps are listed in `APPS` in `progress.py` — add an id there before another
+app can store progress. The user pool and progress table have
+`DeletionPolicy: Retain`, so deleting the stack does not delete accounts.
+
+Cognito's built-in email sender (used for verification codes and password
+resets) is limited to about 50 emails a day; switch the user pool to Amazon
+SES if the site outgrows that.
+
+### Turning on "Continue with Google"
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) → APIs &
+   Services → OAuth consent screen, set up an **External** app (name, support
+   email; scopes `openid`, `email`, `profile`) and publish it.
+2. Credentials → Create credentials → **OAuth client ID** → *Web application*:
+   - Authorized JavaScript origins: `https://<AuthDomain>`
+   - Authorized redirect URIs: the `GoogleRedirectURI` output
+     (`https://<AuthDomain>/oauth2/idpresponse`)
+3. Deploy with the client ID and secret (never commit them; this repo is
+   public). Other parameters keep their previous values:
+
+```bash
+cd backend
+sam build
+sam deploy --stack-name aniketsurve-website --region us-east-1 --capabilities CAPABILITY_IAM --resolve-s3   --parameter-overrides GoogleClientId=<client id> GoogleClientSecret=<client secret>
+```
+
+The hosted sign-in page then shows a Google button alongside email/password.
+Later deploys without `--parameter-overrides` keep the Google settings
+(SAM reuses previous parameter values for anything not overridden).
 
 ## Adding blog posts
 
