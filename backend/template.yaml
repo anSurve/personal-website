@@ -46,8 +46,26 @@ Parameters:
       OAuth client secret matching GoogleClientId. Pass via
       --parameter-overrides; never commit it, since this repo is public.
 
+  SiteDomain:
+    Type: String
+    Default: aniketsurve.com
+    Description: >
+      Custom domain served by CloudFront (www.<domain> redirects to it).
+      Leave blank to use only the *.cloudfront.net address.
+  SiteCertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-1:792520190246:certificate/78558c4b-54f2-470d-82b1-0563bb0876a3
+    Description: >
+      ACM certificate in us-east-1 covering SiteDomain and www.SiteDomain
+      (CloudFront only accepts us-east-1 certificates).
+  SiteHostedZoneId:
+    Type: String
+    Default: Z01075611OYA1TZ92U1TC
+    Description: Route 53 hosted zone for SiteDomain, where the DNS records are created.
+
 Conditions:
   HasGoogle: !Not [!Equals [!Ref GoogleClientId, ""]]
+  HasDomain: !Not [!Equals [!Ref SiteDomain, ""]]
 
 Globals:
   Function:
@@ -159,9 +177,11 @@ Resources:
       AllowedOAuthFlows: [code]
       AllowedOAuthScopes: [openid, email, profile]
       CallbackURLs:
+        - !If [HasDomain, !Sub "https://${SiteDomain}/auth/callback.html", !Ref AWS::NoValue]
         - !Sub "https://${SiteDistribution.DomainName}/auth/callback.html"
         - http://localhost:8765/auth/callback.html
       LogoutURLs:
+        - !If [HasDomain, !Sub "https://${SiteDomain}/auth/callback.html", !Ref AWS::NoValue]
         - !Sub "https://${SiteDistribution.DomainName}/auth/callback.html"
         - http://localhost:8765/auth/callback.html
       SupportedIdentityProviders: !If
@@ -198,12 +218,48 @@ Resources:
           QueryStringsConfig:
             QueryStringBehavior: none
 
+  # Sends www.<domain> to the bare domain so the site has one address.
+  WwwRedirectFunction:
+    Type: AWS::CloudFront::Function
+    Condition: HasDomain
+    Properties:
+      Name: !Sub "${AWS::StackName}-www-redirect"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Redirect www to the apex domain
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var req = event.request;
+          var host = req.headers.host ? req.headers.host.value : "";
+          if (host.indexOf("www.") !== 0) return req;
+          var qs = Object.keys(req.querystring).map(function (k) {
+            var v = req.querystring[k];
+            return v.value ? k + "=" + v.value : k;
+          }).join("&");
+          return {
+            statusCode: 301,
+            statusDescription: "Moved Permanently",
+            headers: { location: { value: "https://" + host.slice(4) + req.uri + (qs ? "?" + qs : "") } },
+          };
+        }
+
   SiteDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Comment: !Sub "${AWS::StackName} website (HTTPS)"
         Enabled: true
+        Aliases: !If
+          - HasDomain
+          - [!Ref SiteDomain, !Sub "www.${SiteDomain}"]
+          - !Ref AWS::NoValue
+        ViewerCertificate: !If
+          - HasDomain
+          - AcmCertificateArn: !Ref SiteCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
         DefaultRootObject: index.html
         HttpVersion: http2and3
         PriceClass: PriceClass_200
@@ -220,6 +276,39 @@ Resources:
           CachedMethods: [GET, HEAD]
           Compress: true
           CachePolicyId: !Ref SiteCachePolicy
+          FunctionAssociations: !If
+            - HasDomain
+            - - EventType: viewer-request
+                FunctionARN: !GetAtt WwwRedirectFunction.FunctionMetadata.FunctionARN
+            - !Ref AWS::NoValue
+
+  # DNS: <domain> and www.<domain> -> CloudFront (IPv4 and IPv6)
+  SiteDnsRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: HasDomain
+    Properties:
+      HostedZoneId: !Ref SiteHostedZoneId
+      RecordSets:
+        - Name: !Ref SiteDomain
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2  # fixed zone id for all CloudFront aliases
+        - Name: !Ref SiteDomain
+          Type: AAAA
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2  # fixed zone id for all CloudFront aliases
+        - Name: !Sub "www.${SiteDomain}"
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2  # fixed zone id for all CloudFront aliases
+        - Name: !Sub "www.${SiteDomain}"
+          Type: AAAA
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2  # fixed zone id for all CloudFront aliases
 
   WebsiteApi:
     Type: AWS::Serverless::Api
@@ -456,7 +545,10 @@ Outputs:
     Description: Name of the S3 bucket to sync the frontend files to
     Value: !Ref FrontendBucket
   SiteURL:
-    Description: HTTPS address of the site (CloudFront). Use this one; sign-in only works here.
+    Description: HTTPS address of the site. Use this one; sign-in only works over HTTPS.
+    Value: !If [HasDomain, !Sub "https://${SiteDomain}", !Sub "https://${SiteDistribution.DomainName}"]
+  CloudFrontURL:
+    Description: The distribution's own address (keeps working alongside the custom domain)
     Value: !Sub "https://${SiteDistribution.DomainName}"
   DistributionId:
     Description: CloudFront distribution ID, for cache invalidations after a frontend deploy
