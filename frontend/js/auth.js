@@ -4,7 +4,8 @@
 // Needs window.AUTH_CONFIG from js/config.js. Adds a "Sign in" button / user
 // menu to every page's nav.site-nav, and exposes window.SiteAuth for apps:
 //   SiteAuth.isSignedIn(), .user(), .getIdToken(), .apiFetch(path, init),
-//   .signIn(), .signOut(); fires "siteauth:change" on window.
+//   .signIn(), .signOut(); fires "siteauth:change" on window. Elements with a
+// data-signed-in-only attribute are hidden unless someone is signed in.
 (() => {
   const cfg = window.AUTH_CONFIG || {};
   const enabled = !!(cfg.domain && cfg.clientId);
@@ -141,6 +142,8 @@
 
   // ---------- Header widget ----------
   function renderNav() {
+    // Elements marked data-signed-in-only (e.g. app cards) show only when signed in
+    document.querySelectorAll("[data-signed-in-only]").forEach(el => { el.hidden = !(enabled && isSignedIn()); });
     const nav = document.querySelector("nav.site-nav");
     if (!nav || !enabled) return;
     let slot = nav.querySelector(".auth-slot");

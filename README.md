@@ -25,6 +25,7 @@ frontend/
     anatomy/              3D bones + muscles explorer (three.js, BodyParts3D models)
     circulation/          3D heart, arteries, veins + hormone routes (reuses anatomy's bones.glb)
     agentic-ai/           12-lesson interactive course on AI agents (vanilla JS + SVG, no model calls)
+    interview-plan/       16-week interview prep plan tracker (signed-in users only)
 scripts/
   add_post.py             admin CLI to write a blog post directly into DynamoDB
   add_song.py             admin CLI to upload a song to S3 and update songs/manifest.json
@@ -86,10 +87,21 @@ aws cloudfront create-invalidation --distribution-id <DistributionId> --paths "/
 `--cache-control "no-cache"` makes browsers check for a newer copy on every
 visit, so a deploy never leaves anyone with a new page and an old script.
 
-The site is served over HTTPS at the `SiteURL` output (CloudFront in front of
-the bucket). The old `WebsiteURL` (`http://…s3-website…`) still works, but
-sign-in only works on the HTTPS address; the "Sign in" button there sends
-people to `SiteURL`.
+The site is served over HTTPS at the `SiteURL` output, https://aniketsurve.com
+(CloudFront in front of the bucket). `www.aniketsurve.com` redirects there via
+a CloudFront Function. The `CloudFrontURL` (`https://…cloudfront.net`) and the
+old `WebsiteURL` (`http://…s3-website…`) still work, but sign-in only works over
+HTTPS; the "Sign in" button on the HTTP address sends people to `SiteURL`.
+
+### Custom domain
+
+The domain is registered in Route 53, which created its hosted zone. The
+template's `SiteDomain`, `SiteCertificateArn` and `SiteHostedZoneId` defaults
+wire it up: CloudFront aliases + certificate, `A`/`AAAA` alias records for the
+apex and `www`, the `www` → apex redirect, and the domain's callback URL on the
+Cognito app client. The certificate (ACM, `us-east-1`, DNS-validated via
+CNAMEs in the hosted zone) renews automatically as long as those CNAMEs stay
+in place. Set `SiteDomain` to `""` to go back to the CloudFront address only.
 
 Once you know the site's URL, set `CorsAllowOrigin`'s `Default:` in
 `template.yaml` to that URL and redeploy to lock the API down to your own
@@ -199,6 +211,26 @@ for f in arteries veins organs; do npx @gltf-transform/cli@4.1.1 meshopt <out-di
 
 Route steps reference structures by name (`"renal vein~left"`), so check
 `routes.js` still resolves after a rebuild.
+
+## Interview plan tracker
+
+`frontend/apps/interview-plan/` is a day-by-day tracker for a 16-week Big Tech
+AI / Forward Deployed Engineer prep plan. It only shows for signed-in users:
+the Apps page card carries `data-signed-in-only` (which `js/auth.js` hides
+when nobody is signed in), and the page itself shows a sign-in prompt instead
+of the plan. Each user enrolls, then marks days (and the H-1B checklist)
+complete; progress is stored per user via `/progress/fde-plan`.
+
+- `plan.js` holds the plan text: one entry per day, Sunday → Saturday, for 16
+  weeks starting at `start`. Day ids are `w<week>-<sun..sat>` and `h1b-<n>`;
+  they must match `PLAN_ITEMS` in `progress.py`, so update both together if the
+  plan's shape changes.
+- Unlike the course app (whose progress only grows), plan progress is applied
+  per item, so days can be un-marked: `PUT {"changes": {"w3-mon": true}}`,
+  `{"enroll": true}` to enroll, `{"leave": true}` to delete the record.
+- The plan text ships with the static site, so anyone with the URL could read
+  `plan.js`; sign-in gates the tracker and each person's progress, not the
+  plan itself.
 
 ## Music player
 
