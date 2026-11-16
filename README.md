@@ -229,6 +229,12 @@ when nobody is signed in), and the page itself shows a sign-in prompt instead
 of the plan. Each user enrolls, then marks days (and the H-1B checklist)
 complete; progress is stored per user via `/progress/fde-plan`.
 
+- Signed-in users land on **Today** (`#today`): that day's objectives to tick off
+  (ticking all of them completes the day), plus the day guide if one exists.
+  `#day=w1-mon` opens any day, `#plan` the full 16 weeks, `#reference` the appendix.
+- `content-week1.js` holds the detailed day guides (objectives, lessons, code,
+  LeetCode, links) and fills `window.FDE_CONTENT`; add `content-week2.js` etc. the
+  same way and load them before `tracker.js`. Objective ids are `<day>-o1`…`-o19`.
 - `plan.js` holds the plan text: one entry per day, Sunday → Saturday, for 16
   weeks starting at `start`. Day ids are `w<week>-<sun..sat>` and `h1b-<n>`;
   they must match `PLAN_ITEMS` in `progress.py`, so update both together if the

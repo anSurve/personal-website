@@ -150,3 +150,91 @@
 .ip-leave button:hover { color: var(--warn); }
 
 @media (prefers-reduced-motion: reduce) { .ip * { transition: none !important; } }
+
+/* ---------- Views: tabs ---------- */
+.ip-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); margin: 1.25rem 0 1.25rem; overflow-x: auto; }
+.ip-tab { padding: 0.6rem 0.9rem; font-weight: 600; font-size: 0.95rem; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.ip-tab:hover { color: var(--text); }
+.ip-tab[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ---------- Day view ---------- */
+.ip-dayhead { margin-bottom: 0.75rem; }
+.ip-dayhead h2 { margin: 0.1rem 0 0.15rem; font-size: 1.6rem; }
+.ip-dayhead .eyebrow, .ip-upnext .eyebrow { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); margin: 0; }
+.ip-dayhead .ip-muted { margin: 0; font-size: 0.92rem; }
+.ip-daynav { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.ip-daynav a { text-decoration: none; }
+
+.ip-strip { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; font-size: 0.88rem; color: var(--muted); padding: 0.6rem 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+.ip-strip b { color: var(--text); font-variant-numeric: tabular-nums; }
+.ip-strip a { color: var(--warn); text-decoration: none; font-weight: 600; }
+.ip-strip a b { color: inherit; }
+.ip-strip a:hover { text-decoration: underline; }
+
+.ip-card h3 { font-size: 1.05rem; margin: 0 0 0.5rem; }
+.ip-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.ip-card-head .count { font-size: 0.9rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ip-objectives { border-color: var(--accent); }
+.ip-objectives.is-done { border-color: var(--ok); }
+.ip-objectives .bar { margin: 0.2rem 0 0.8rem; }
+.ip-goal { font-size: 1.02rem; margin: 0 0 0.6rem; }
+.ip-obj li > div { display: grid; gap: 0.15rem; padding-top: 0.25rem; }
+.ip-obj small { color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
+.ip-obj li.done span { color: var(--muted); }
+.ip-daydone { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.ip-daydone small { color: var(--muted); font-size: 0.82rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.ip-objectives > .tags { display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: 0.76rem; }
+
+.ip-section { font-size: 1.1rem; margin: 1.5rem 0 0.25rem; }
+.ip-fold { padding: 0; }
+.ip-fold > summary { cursor: pointer; padding: 0.9rem 1.2rem; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 0.5rem; }
+.ip-fold > summary::-webkit-details-marker { display: none; }
+.ip-fold > summary::before { content: "▸"; color: var(--muted); transition: transform 0.15s ease; }
+.ip-fold[open] > summary::before { transform: rotate(90deg); }
+.ip-fold > summary .tag { margin-left: auto; font-weight: 500; }
+.ip-prose { padding: 0 1.2rem 1rem; }
+.ip-prose p { margin: 0 0 0.6rem; }
+.ip-prose ul, .ip-prose ol { margin: 0 0 0.6rem; padding-left: 1.2rem; }
+.ip-prose li { margin: 0.3rem 0; }
+.ip code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-size: 0.88em; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 5px; padding: 0.05em 0.3em; }
+
+.ip-codewrap { display: flex; flex-direction: column; padding: 0 1.2rem 1.1rem; }
+.ip-codewrap pre { margin: 0; max-width: 100%; overflow-x: auto; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; line-height: 1.5; }
+.ip-codewrap pre code { background: none; border: 0; padding: 0; font-size: 0.8rem; white-space: pre; }
+.ip-copy { align-self: flex-end; margin-bottom: 0.4rem; font-size: 0.75rem; padding: 0.2rem 0.7rem; }
+
+.ip-lc { list-style: none; padding: 0 !important; margin: 0; display: grid; gap: 0.6rem; }
+.ip-lc li { margin: 0 !important; }
+.ip-lc details { margin-top: 0.2rem; font-size: 0.88rem; }
+.ip-lc summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+.ip-lc details p { margin: 0.3rem 0 0; color: var(--muted); }
+.ip-small { font-size: 0.82rem; margin: 0.75rem 0 0; }
+.ip-links li { margin: 0.35rem 0; }
+:where(.ip-prose, .ip-links, .ip-lc, .ip-note, .ip-callout) a { color: var(--accent); }
+
+.ip-callout { border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0; padding: 0.75rem 1rem; margin: 1rem 0; }
+.ip-callout.ok { border-left-color: var(--ok); background: var(--ok-soft); }
+.ip-callout p { margin: 0.2rem 0 0; }
+.ip-note { font-size: 0.9rem; color: var(--muted); background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 0.9rem; margin: 0.75rem 0; }
+
+.ip-upnext { display: grid; gap: 0.2rem; margin: 1.5rem 0 0; padding: 0.9rem 1.1rem; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--text); text-decoration: none; }
+.ip-upnext:hover { border-color: var(--accent); }
+
+.tag.link { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+.tag.link:hover { background: var(--accent-soft); }
+
+/* Phones: keep today's objectives near the top */
+@media (max-width: 640px) {
+  .ip h1 { font-size: 1.6rem; }
+  .ip .lede { font-size: 0.92rem; margin-bottom: 0.25rem; }
+  .ip .back { margin-top: 1rem; }
+  .ip-tabs { margin: 0.75rem 0 1rem; }
+  .ip-dayhead h2 { font-size: 1.35rem; }
+  .ip-card { padding: 1rem 1.05rem; }
+  .ip-fold > summary { padding: 0.85rem 1.05rem; }
+  .ip-prose, .ip-codewrap { padding-left: 1.05rem; padding-right: 1.05rem; }
+}
+
+/* Icons inside buttons (e.g. Mark day complete) */
+.ip .btn > svg { width: 18px; height: 18px; flex: none; }
+.ip-daydone .btn { white-space: nowrap; }

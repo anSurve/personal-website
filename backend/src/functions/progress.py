@@ -15,8 +15,10 @@ ITEM_ID = re.compile(r"^[a-z0-9-]{1,40}$")
 MAX_VISITED = 100
 
 PLAN_DAYS = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
+PLAN_DAY_IDS = [f"w{w}-{d}" for w in range(1, 17) for d in PLAN_DAYS]  # one per day of the plan
 PLAN_ITEMS = frozenset(
-    [f"w{w}-{d}" for w in range(1, 17) for d in PLAN_DAYS]  # one per day of the plan
+    PLAN_DAY_IDS
+    + [f"{day}-o{n}" for day in PLAN_DAY_IDS for n in range(1, 20)]  # a day guide's objectives
     + [f"h1b-{i}" for i in range(1, 6)]  # Appendix B checklist
 )
 
