@@ -36,6 +36,10 @@
 .ip-card li { margin: 0.3rem 0; }
 .ip-gate { text-align: center; padding: 2.25rem 1.4rem; }
 .ip-gate p { max-width: 34rem; margin: 0.5rem auto 1.25rem; color: var(--muted); }
+.ip-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; }
+.ip .btn-google { background: #fff; color: #1f1f1f; border-color: #dadce0; }
+.ip .btn-google:hover { border-color: #b5b9be; }
+.ip .btn-google svg { width: 18px; height: 18px; }
 .ip .btn[disabled] { opacity: 0.6; cursor: default; transform: none; }
 
 /* Sync status */
