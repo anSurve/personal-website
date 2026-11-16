@@ -235,6 +235,10 @@ complete; progress is stored per user via `/progress/fde-plan`.
 - `content-week1.js` holds the detailed day guides (objectives, lessons, code,
   LeetCode, links) and fills `window.FDE_CONTENT`; add `content-week2.js` etc. the
   same way and load them before `tracker.js`. Objective ids are `<day>-o1`…`-o19`.
+- The **Job tracker** tab (`#jobs`, `jobs.js`) keeps each user's job list via
+  `/progress/fde-jobs`: `PUT {"upsert": job | [jobs]}` or `{"delete": id}`, validated
+  in `progress.py` and saved with a version check so two devices can't overwrite
+  each other. It works without enrolling in the plan.
 - `plan.js` holds the plan text: one entry per day, Sunday → Saturday, for 16
   weeks starting at `start`. Day ids are `w<week>-<sun..sat>` and `h1b-<n>`;
   they must match `PLAN_ITEMS` in `progress.py`, so update both together if the

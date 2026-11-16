@@ -4,13 +4,15 @@
 // (backend/src/functions/progress.py), with a per-user copy cached on this
 // device so the page opens instantly.
 //
-// Views (URL hash): #today (default) or #day=w1-mon, #plan, #reference.
+// Views (URL hash): #today (default) or #day=w1-mon, #plan, #reference,
+// #jobs (the job-search tracker, drawn by jobs.js).
 // Day guides (objectives, lessons, code…) come from content-week*.js files
 // that fill window.FDE_CONTENT; days without a guide show the plan line.
 (() => {
   const P = window.FDE_PLAN;
   const CONTENT = window.FDE_CONTENT || {};
   const auth = window.SiteAuth;
+  const JOBS = window.FDEJobs;
   const APP = "fde-plan";
   const CACHE = "fde-plan:"; // + user id
   const PREF_HIDE = "fde-plan-hide-done";
@@ -180,6 +182,7 @@
     const h = decodeURIComponent(location.hash.slice(1));
     if (h === "plan") return { view: "plan" };
     if (h === "reference") return { view: "ref" };
+    if (h === "jobs") return { view: "jobs" };
     const m = h.match(/^day=(w\d+-[a-z]{3})$/);
     const d = m && DAYS.find(x => x.id === m[1]);
     if (d) return { view: "day", index: d.index };
@@ -210,7 +213,7 @@
 
   function tabsHtml(view) {
     const tab = (href, name, label) => `<a href="${href}" class="ip-tab"${view === name ? ' aria-current="page"' : ""}>${label}</a>`;
-    return `<nav class="ip-tabs" aria-label="Plan views">${tab("#today", "day", "Today")}${tab("#plan", "plan", "Full plan")}${tab("#reference", "ref", "Reference")}</nav>`;
+    return `<nav class="ip-tabs" aria-label="Plan views">${tab("#today", "day", "Today")}${tab("#plan", "plan", "Full plan")}${tab("#reference", "ref", "Reference")}${tab("#jobs", "jobs", "Job tracker")}</nav>`;
   }
 
   // ----- Day view (the default "Today" screen) -----
@@ -404,15 +407,18 @@
       return;
     }
 
-    // Keep focus (and open code blocks) on the same controls across re-renders
-    const focused = document.activeElement && root.contains(document.activeElement) ? document.activeElement.getAttribute("data-toggle") || document.activeElement.getAttribute("data-act") : null;
+    // Keep focus, the caret, and open code blocks across re-renders
+    const ae = document.activeElement && root.contains(document.activeElement) ? document.activeElement : null;
+    const focusKeys = ["data-fkey", "data-toggle", "data-act", "data-job-act", "data-job-filter", "data-job-edit", "data-job-status"];
+    const focused = ae && focusKeys.map(a => ae.hasAttribute(a) && [a, ae.getAttribute(a)]).find(Boolean);
+    const caret = ae && ae.tagName === "INPUT" ? ae.selectionStart : null;
     const openFolds = [...root.querySelectorAll("details.ip-fold")].map(el => el.open);
     const t = indexOf(today());
     const allow = enrolled() && !busy;
     const r = route();
 
-    let html = `<p class="ip-sync"></p>`;
-    if (!enrolled()) {
+    let html = r.view === "jobs" ? "" : `<p class="ip-sync"></p>`;
+    if (!enrolled() && r.view !== "jobs") {
       html += `<div class="ip-card ip-today">
         <p class="eyebrow">Not enrolled yet</p>
         <p class="task">Enroll to start: you'll land on each day's objectives, tick them off as you go, and track your progress by week and phase. Progress is saved to your account (${esc(u.email || u.name)}) and only you can see it. Below is a preview.</p>
@@ -420,20 +426,24 @@
       </div>`;
     }
     html += tabsHtml(r.view);
-    html += r.view === "plan" ? planView(t, allow) : r.view === "ref" ? refView(allow) : dayView(r.index, t, allow, r.isToday);
+    html += r.view === "plan" ? planView(t, allow) : r.view === "ref" ? refView(allow) : r.view === "jobs" ? JOBS.html() : dayView(r.index, t, allow, r.isToday);
 
     root.innerHTML = html;
     renderSync();
     const folds = root.querySelectorAll("details.ip-fold");
     if (folds.length === openFolds.length) folds.forEach((el, k) => { el.open = openFolds[k]; });
     if (focused) {
-      const el = root.querySelector(`[data-toggle="${focused}"]`) || root.querySelector(`[data-act="${focused}"]`);
-      if (el) el.focus({ preventScroll: true });
+      const el = root.querySelector(`[${focused[0]}="${CSS.escape(focused[1])}"]`);
+      if (el) {
+        el.focus({ preventScroll: true });
+        if (caret != null) try { el.setSelectionRange(caret, caret); } catch (e) {}
+      }
     }
   }
 
   // ---------- Events ----------
   root.addEventListener("click", e => {
+    if (JOBS.onClick(e)) return;
     const tgl = e.target.closest("[data-toggle]");
     if (tgl && !tgl.disabled) { toggle(tgl.getAttribute("data-toggle")); return; }
     const copy = e.target.closest("[data-copy]");
@@ -477,6 +487,8 @@
       }
     }
   });
+  root.addEventListener("change", e => JOBS.onChange(e));
+  root.addEventListener("input", e => JOBS.onInput(e));
   // Remember which weeks are open
   root.addEventListener("toggle", e => {
     const w = e.target.closest && e.target.closest("details[data-week]");
@@ -497,6 +509,7 @@
     const u = user();
     userSub = u ? u.sub : null;
     dropOtherCaches(userSub); // never leave someone else's plan on a shared device
+    JOBS.reset(userSub);
     state = null; pending = {}; sync = "idle"; openWeeks = null;
     if (u) {
       const cached = ls.get(CACHE + userSub);
@@ -507,6 +520,7 @@
       render();
     }
   }
+  JOBS.init({ auth, esc, rerender: () => render(), targets: P.targets });
   window.addEventListener("siteauth:change", () => { if ((user() || {}).sub !== userSub) start_(); });
   // Retry unsaved changes when the connection comes back
   window.addEventListener("online", () => { if (Object.keys(pending).length) schedulePush(0); });

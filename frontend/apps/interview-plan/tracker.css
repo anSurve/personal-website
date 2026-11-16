@@ -228,7 +228,8 @@
   .ip h1 { font-size: 1.6rem; }
   .ip .lede { font-size: 0.92rem; margin-bottom: 0.25rem; }
   .ip .back { margin-top: 1rem; }
-  .ip-tabs { margin: 0.75rem 0 1rem; }
+  .ip-tabs { margin: 0.75rem 0 1rem; gap: 0; }
+  .ip-tab { padding: 0.55rem 0.55rem; font-size: 0.9rem; }
   .ip-dayhead h2 { font-size: 1.35rem; }
   .ip-card { padding: 1rem 1.05rem; }
   .ip-fold > summary { padding: 0.85rem 1.05rem; }
@@ -238,3 +239,72 @@
 /* Icons inside buttons (e.g. Mark day complete) */
 .ip .btn > svg { width: 18px; height: 18px; flex: none; }
 .ip-daydone .btn { white-space: nowrap; }
+
+/* ---------- Job tracker tab (jobs.js) ---------- */
+.ip .link-btn, .jb-dialog .link-btn { font: inherit; font-weight: 600; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+.jb-sync { margin-top: 0; }
+.jb-pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin: 0.25rem 0 1rem; }
+.jb-stage { background: var(--card-bg); border: 1px solid var(--border); border-top: 3px solid var(--muted); border-radius: 10px; padding: 0.55rem 0.75rem; }
+.jb-stage b { display: block; font-size: 1.35rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.jb-stage span { font-size: 0.8rem; color: var(--muted); }
+.jb-stage.s-applied { border-top-color: var(--accent); }
+.jb-stage.s-interviewing { border-top-color: #7c3aed; }
+.jb-stage.s-offer { border-top-color: var(--ok); }
+.jb-stage.s-rejected { border-top-color: var(--border); }
+@media (max-width: 640px) { .jb-pipeline { grid-template-columns: repeat(3, 1fr); } }
+.jb-due { color: var(--warn); font-weight: 600; }
+.jb-due b { color: inherit !important; }
+
+.jb-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0.5rem 0 0.75rem; }
+.jb-toolbar .btn { padding: 0.5rem 1rem; }
+.jb-search { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 0.92rem; padding: 0.5rem 0.75rem; border-radius: 10px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); }
+.jb-search:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.jb-filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+.jb-filters .chip-btn span { font-weight: 500; opacity: 0.75; margin-left: 0.15rem; }
+
+.jb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.jb-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; align-items: start; background: var(--card-bg); border: 1px solid var(--border); border-left: 4px solid var(--muted); border-radius: 12px; padding: 0.85rem 1rem; }
+.jb-row.s-applied { border-left-color: var(--accent); }
+.jb-row.s-interviewing { border-left-color: #7c3aed; }
+.jb-row.s-offer { border-left-color: var(--ok); }
+.jb-row.s-rejected, .jb-row.s-withdrawn { border-left-color: var(--border); opacity: 0.75; }
+.jb-title { overflow-wrap: anywhere; }
+.jb-title span { color: var(--muted); }
+.jb-link { font-size: 0.85rem; color: var(--accent); white-space: nowrap; }
+.jb-meta { font-size: 0.84rem; color: var(--muted); margin-top: 0.15rem; }
+.jb-next { font-size: 0.88rem; margin-top: 0.35rem; }
+.jb-next.overdue { color: var(--warn); font-weight: 600; }
+.jb-notes { font-size: 0.84rem; color: var(--muted); margin-top: 0.35rem; white-space: pre-line; overflow-wrap: anywhere; }
+.jb-actions { display: flex; gap: 0.4rem; align-items: center; }
+.jb-actions select { font: inherit; font-size: 0.85rem; padding: 0.3rem 0.4rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); }
+@media (max-width: 520px) {
+  .jb-row { grid-template-columns: 1fr; }
+  .jb-actions { flex-direction: row; }
+  .jb-actions select { flex: 1; }
+}
+
+/* Add / edit dialog (appended to <body>, so it can't use .ip-scoped tokens) */
+.jb-dialog {
+  --ok: #15803d; --warn: #b45309;
+  width: min(640px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 0; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--card-bg); color: var(--text); box-shadow: var(--shadow-hover);
+}
+@media (prefers-color-scheme: dark) { .jb-dialog { --warn: #fbbf24; } }
+.jb-dialog::backdrop { background: rgba(15, 17, 21, 0.55); }
+.jb-form { padding: 1.25rem 1.4rem; }
+.jb-form h2 { font-size: 1.2rem; margin: 0 0 1rem; }
+.jb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem 1rem; }
+.jb-field { display: grid; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; min-width: 0; }
+.jb-field.wide { grid-column: 1 / -1; }
+.jb-field input, .jb-field select, .jb-field textarea {
+  font: inherit; font-weight: 400; font-size: 0.95rem; width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+}
+.jb-field input:focus, .jb-field select:focus, .jb-field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.jb-field textarea { resize: vertical; }
+@media (max-width: 520px) { .jb-grid { grid-template-columns: 1fr; } }
+.jb-error { color: var(--warn); font-size: 0.9rem; margin: 0.75rem 0 0; }
+.jb-buttons { display: flex; gap: 0.6rem; align-items: center; margin-top: 1.1rem; }
+.jb-buttons > span { flex: 1; }
+.jb-buttons .btn { padding: 0.55rem 1.1rem; }
+.jb-delete { font: inherit; font-size: 0.9rem; color: var(--warn); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; align-self: center; }
